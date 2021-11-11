@@ -6,7 +6,7 @@ import hu.bme.mit.theta.common.Utils;
 
 import java.util.List;
 
-public final class NonDetStmt implements Stmt {
+public class NonDetStmt implements Stmt {
 
 	private final List<Stmt> stmts;
 
@@ -15,7 +15,7 @@ public final class NonDetStmt implements Stmt {
 
 	private volatile int hashCode = 0;
 
-	private NonDetStmt(final List<Stmt> stmts) {
+	protected NonDetStmt(final List<Stmt> stmts) {
 		if (stmts.isEmpty()) this.stmts= ImmutableList.of(SkipStmt.getInstance());
 		else this.stmts = stmts;
 	}

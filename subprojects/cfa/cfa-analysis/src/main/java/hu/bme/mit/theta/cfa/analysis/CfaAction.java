@@ -42,6 +42,14 @@ public final class CfaAction extends StmtAction {
 		this.stmts = Collections.unmodifiableList(edges.stream().map(Edge::getStmt).collect(Collectors.toList()));
 	}
 
+	// TODO: get rid of this as soon as possible
+	public CfaAction(final List<Stmt> stmts, final Loc source, final Loc target) {
+		this.edges = Collections.emptyList();
+		this.source = source;
+		this.target = target;
+		this.stmts = stmts;
+	}
+
 	public static CfaAction create(final Edge edge) {
 		return new CfaAction(edge.getSource(), edge.getTarget(), Collections.singletonList(edge));
 	}

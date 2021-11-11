@@ -26,7 +26,7 @@ import hu.bme.mit.theta.analysis.TransFunc;
 import hu.bme.mit.theta.analysis.expr.ExprState;
 import hu.bme.mit.theta.cfa.CFA.Loc;
 
-final class CfaTransFunc<S extends ExprState, P extends Prec> implements TransFunc<CfaState<S>, CfaAction, CfaPrec<P>> {
+public final class CfaTransFunc<S extends ExprState, P extends Prec> implements TransFunc<CfaState<S>, CfaAction, CfaPrec<P>> {
 
 	private final TransFunc<S, ? super CfaAction, ? super P> transFunc;
 

@@ -23,12 +23,12 @@ import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.anytype.PrimeExpr;
 import hu.bme.mit.theta.core.type.anytype.RefExpr;
 
-final class PrimeCounter {
+public final class PrimeCounter {
 
 	private PrimeCounter() {
 	}
 
-	static VarIndexing countPrimes(final Expr<?> expr) {
+	public static VarIndexing countPrimes(final Expr<?> expr) {
 		return collectPrimes(expr, 0).build();
 	}
 
