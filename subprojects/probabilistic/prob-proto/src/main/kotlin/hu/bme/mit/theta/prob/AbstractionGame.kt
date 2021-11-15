@@ -39,7 +39,7 @@ class AbstractionGame<S: State, LAbs, LConc>(
     /**
      * Class for representing edges between concrete choice nodes and distributions
      */
-    class ConcreteChoiceEdge<S: State, L>(val start: ChoiceNode<S, L>, val end: EnumeratedDistribution<S>, val label: L) {
+    class ConcreteChoiceEdge<S: State, L>(val start: ChoiceNode<S, L>, val end: EnumeratedDistribution<StateNode<S, *>>, val label: L) {
         init {
             start.outgoingEdges.add(this)
         }
@@ -52,11 +52,11 @@ class AbstractionGame<S: State, LAbs, LConc>(
 
     fun connect(s: StateNode<S, LAbs>, concreteChoiceNode: ChoiceNode<S, LConc>, label: LAbs) {
         // TODO: meaningful exception handling
-        val edge = AbstractionChoiceEdge<S, LAbs>(s, concreteChoiceNode, label)
+        val edge = AbstractionChoiceEdge(s, concreteChoiceNode, label)
         abstractionChoiceEdges.add(edge)
     }
 
-    fun connect(concreteChoiceNode: ChoiceNode<S, LConc>, distribution: EnumeratedDistribution<S>, label: LConc) {
+    fun connect(concreteChoiceNode: ChoiceNode<S, LConc>, distribution: EnumeratedDistribution<StateNode<S, *>>, label: LConc) {
         val edge = ConcreteChoiceEdge<S, LConc>(concreteChoiceNode, distribution, label)
         concreteChoiceEdges.add(edge)
     }
