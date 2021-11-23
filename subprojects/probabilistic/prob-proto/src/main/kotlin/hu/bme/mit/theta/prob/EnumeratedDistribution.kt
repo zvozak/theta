@@ -13,4 +13,8 @@ class EnumeratedDistribution<D, M>(
     }
 
     fun isDirac() = pmf.size == 1
+
+    override fun toString(): String {
+        return "[${pmf.map { "${it.value}:${it.key}" }.joinToString(", ")}]"
+    }
 }

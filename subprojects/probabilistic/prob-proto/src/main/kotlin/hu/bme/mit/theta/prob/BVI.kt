@@ -158,25 +158,29 @@ fun <S : State, LAbs, LConc> BVI(
 
         // Deflation
         for (msec in msecs) {
+            var bestExit = 0.0
             if(playerAGoal == OptimType.MAX) {
-                val bestExit = msec.first.flatMap {
+                bestExit = msec.first.flatMap {
                     it.outgoingEdges.map { UC[it.end]!! }
                 }.max() ?: 0.0
-                for (stateNode in msec.first) {
-                    UA[stateNode] = min(UA[stateNode]!!, bestExit)
-                }
             }
             if(playerCGoal == OptimType.MAX) {
-                val bestExit = msec.second.flatMap {
+                val bestAExit =msec.second.flatMap {
                     it.outgoingEdges.map {
                         it.end.pmf.entries.sumByDouble { (stateNode, prob) ->
                             prob * (LA[stateNode]!!)
                         }
                     }
                 }.max() ?: 0.0
-                for (choiceNode in msec.second) {
-                    UC[choiceNode] = min(UC[choiceNode]!!, bestExit)
-                }
+                if(bestAExit > bestExit) bestExit = bestAExit
+            }
+
+            for (stateNode in msec.first) {
+                UA[stateNode] = min(UA[stateNode]!!, bestExit)
+            }
+
+            for (choiceNode in msec.second) {
+                UC[choiceNode] = min(UC[choiceNode]!!, bestExit)
             }
         }
 
@@ -184,8 +188,8 @@ fun <S : State, LAbs, LConc> BVI(
         val largestStateError = game.stateNodes.map { UA[it]!!-LA[it]!! }.max() ?: 0.0
         val largestChoiceError = game.concreteChoiceNodes.map { UC[it]!!-LC[it]!! }.max() ?: 0.0
         val largestError = max(largestStateError, largestChoiceError)
-//    } while(errorOnCheckedNodes > threshold)
-    } while(largestError > threshold)
+    } while(errorOnCheckedNodes > threshold)
+//    } while(largestError > threshold)
 
     return AbstractionGameCheckResult(avgMap(LA, UA), avgMap(LC, UC))
 }

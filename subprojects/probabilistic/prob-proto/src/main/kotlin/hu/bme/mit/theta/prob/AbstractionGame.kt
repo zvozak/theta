@@ -21,13 +21,19 @@ class AbstractionGame<S: State, LAbs, LConc>(
      * @param S The type representing abstract states
      * @param L The type used for labeling outgoing edges.
      */
-    class StateNode<S: State, L>(val state: S, val outgoingEdges: HashSet<AbstractionChoiceEdge<S, L>> = hashSetOf()) {}
+    class StateNode<S: State, L>(val state: S, val outgoingEdges: HashSet<AbstractionChoiceEdge<S, L>> = hashSetOf()) {
+        override fun toString(): String = state.toString()
+    }
 
     /**
      * @param S The type representing abstract states
      * @param L The type used for labeling outgoing edges.
      */
-    class ChoiceNode<S: State, L>(val outgoingEdges: HashSet<ConcreteChoiceEdge<S, L>> = hashSetOf()) {}
+    class ChoiceNode<S: State, L>(val outgoingEdges: HashSet<ConcreteChoiceEdge<S, L>> = hashSetOf()) {
+        override fun toString(): String {
+            return "{${outgoingEdges.map { it.end.toString() }.joinToString(", ")}}"
+        }
+    }
 
     /**
      * Class for representing edges between abstract states and choice nodes of the _concrete_ non-determinism.
