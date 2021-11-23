@@ -1,13 +1,19 @@
 package hu.bme.mit.theta.prob
 
 import hu.bme.mit.theta.analysis.State
+import hu.bme.mit.theta.core.stmt.Stmt
 
 class AbstractionGame<S: State, LAbs, LConc>(
     val stateNodes: MutableSet<StateNode<S, LAbs>> = hashSetOf(),
+    val initNodes: MutableSet<StateNode<S, LAbs>> = hashSetOf(),
     val concreteChoiceNodes: MutableSet<ChoiceNode<S, LConc>> = hashSetOf(),
     val abstractionChoiceEdges: MutableSet<AbstractionChoiceEdge<S, LAbs>> = hashSetOf(),
     val concreteChoiceEdges: MutableSet<ConcreteChoiceEdge<S, LConc>> = hashSetOf()
 ) {
+
+    init {
+        require(stateNodes.containsAll(initNodes))
+    }
 
     val stateNodeMap = hashMapOf<S, StateNode<S, LAbs>>()
 
@@ -39,24 +45,30 @@ class AbstractionGame<S: State, LAbs, LConc>(
     /**
      * Class for representing edges between concrete choice nodes and distributions
      */
-    class ConcreteChoiceEdge<S: State, L>(val start: ChoiceNode<S, L>, val end: EnumeratedDistribution<StateNode<S, *>>, val label: L) {
+    class ConcreteChoiceEdge<S: State, L>(val start: ChoiceNode<S, L>, val end: EnumeratedDistribution<StateNode<S, *>, MutableList<Stmt>>, val label: L) {
         init {
             start.outgoingEdges.add(this)
         }
     }
 
-    fun createStateNode(s: S): StateNode<S, LAbs> = StateNode<S, LAbs>(s).also {stateNodes.add(it); stateNodeMap.put(s, it)}
-    fun createStateNodes(ss: Collection<S>): List<StateNode<S, LAbs>> = ss.map { createStateNode(it) }
+    fun createStateNode(s: S, isInitial: Boolean = false): StateNode<S, LAbs> =
+        StateNode<S, LAbs>(s).also {
+            stateNodes.add(it)
+            stateNodeMap[s] = it
+            if(isInitial) initNodes.add(it)
+        }
+    fun createStateNodes(ss: Collection<S>, isInitial: Boolean): List<StateNode<S, LAbs>> =
+        ss.map { createStateNode(it, isInitial) }
 
     fun createConcreteChoiceNode(): ChoiceNode<S, LConc> = ChoiceNode<S, LConc>().also { concreteChoiceNodes.add(it) }
 
     fun connect(s: StateNode<S, LAbs>, concreteChoiceNode: ChoiceNode<S, LConc>, label: LAbs) {
-        // TODO: meaningful exception handling
+        require(s in stateNodes)
         val edge = AbstractionChoiceEdge(s, concreteChoiceNode, label)
         abstractionChoiceEdges.add(edge)
     }
 
-    fun connect(concreteChoiceNode: ChoiceNode<S, LConc>, distribution: EnumeratedDistribution<StateNode<S, *>>, label: LConc) {
+    fun connect(concreteChoiceNode: ChoiceNode<S, LConc>, distribution: EnumeratedDistribution<StateNode<S, *>, MutableList<Stmt>>, label: LConc) {
         val edge = ConcreteChoiceEdge<S, LConc>(concreteChoiceNode, distribution, label)
         concreteChoiceEdges.add(edge)
     }

@@ -19,15 +19,18 @@ import hu.bme.mit.theta.core.stmt.NonDetStmt
 import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.Type
+import hu.bme.mit.theta.core.type.anytype.Exprs
 import hu.bme.mit.theta.core.type.anytype.PrimeExpr
 import hu.bme.mit.theta.core.type.anytype.RefExpr
 import hu.bme.mit.theta.core.type.booltype.AndExpr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
 import hu.bme.mit.theta.core.type.booltype.BoolExprs.And
+import hu.bme.mit.theta.core.type.booltype.BoolExprs.Not
 import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.*
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
+import kotlin.math.exp
 
 interface GroupedTransferFunction<S: State, A: Action, P: Prec> {
     fun getSuccStates(state: S, action: A, prec: P): List<List<S>>
@@ -95,6 +98,9 @@ class PredGroupedTransferFunction(
         val res = arrayListOf<PredState>()
         WithPushPop(solver).use {
             solver.add(PathUtils.unfold(fullExpr, VarIndexing.all(0)))
+            for ((i, pred) in preds.withIndex()) {
+                solver.add(BoolExprs.Iff(actLits[i].ref, PathUtils.unfold(pred, unfoldResult.indexing)))
+            }
             while (solver.check().isSat) {
                 val model = solver.model
 
@@ -111,11 +117,12 @@ class PredGroupedTransferFunction(
                             feedback.add(lit.ref)
                         } else {
                             newPreds.add(prec.negate(pred))
-                            feedback.add(BoolExprs.Not(lit.ref))
+                            feedback.add(Not(lit.ref))
                         }
                     }
                 }
                 res.add(PredState.of(newPreds))
+                solver.add(Not(And(feedback)))
             }
         }
 
@@ -140,12 +147,8 @@ class PredGroupedTransferFunction(
             val unfoldResult = subStmt.unfold()
             val preExpr = And(unfoldResult.exprs)
             val expr = offsetNonZeroPrimes(preExpr, maxPrimes)
-            val indexing = unfoldResult.indexing.transform()
-            for (i in 0 until maxPrimes) {
-                indexing.incAll()
-            }
-            nextIndexings.add(indexing.build())
             val primes = PrimeCounter.countPrimes(expr)
+            nextIndexings.add(primes)
             val vars = arrayListOf<VarDecl<*>>()
             ExprUtils.collectVars(expr, vars)
             maxPrimes = vars.map(primes::get).max() ?: 0
@@ -162,9 +165,13 @@ class PredGroupedTransferFunction(
 
         WithPushPop(solver).use { wp ->
             solver.add(PathUtils.unfold(fullExpr, VarIndexing.all(0)))
+            var litIdx = 0
             for (indexing in nextIndexings) {
-                for ((i, pred) in preds.withIndex()) {
-                    solver.add(BoolExprs.Iff(actLits[i].ref, PathUtils.unfold(pred, indexing)))
+                for (pred in preds) {
+                    val activationExpr = BoolExprs.Iff(
+                        actLits[litIdx++].ref, PathUtils.unfold(pred, indexing)
+                    )
+                    solver.add(activationExpr)
                 }
             }
             while(solver.check().isSat) {
@@ -173,11 +180,11 @@ class PredGroupedTransferFunction(
                 val feedback = ArrayList<Expr<BoolType>>(numActLits+1)
                 feedback.add(BoolExprs.True())
 
-                var litIdx = 0
+                litIdx = 0
                 val newStateList = arrayListOf<PredState>()
                 for(a in stmts.indices) {
                     val newPreds = hashSetOf<Expr<BoolType>>()
-                    for((i, pred) in preds.withIndex()) {
+                    for(pred in preds) {
                         val lit = actLits[litIdx]
                         val eval = model.eval(lit)
                         if(eval.isPresent) {
@@ -186,7 +193,7 @@ class PredGroupedTransferFunction(
                                 feedback.add(lit.ref)
                             } else {
                                 newPreds.add(prec.negate(pred))
-                                feedback.add(BoolExprs.Not(lit.ref))
+                                feedback.add(Not(lit.ref))
                             }
                         }
                         litIdx++
@@ -194,6 +201,7 @@ class PredGroupedTransferFunction(
                     newStateList.add(PredState.of(newPreds))
                 }
                 res.add(newStateList)
+                solver.add(Not(And(feedback)))
             }
         }
         return res
@@ -221,139 +229,11 @@ class PredGroupedTransferFunction(
 fun <T: Type> offsetNonZeroPrimes(expr: Expr<T>, offset: Int): Expr<T> {
     if(offset == 0) return expr
     return if(expr is PrimeExpr) {
-        // TODO: make this less ugly
-        var res = expr
-        for(i in 0 until offset) {
-            res = PrimeExpr.of(res)
-        }
-        res
+        // TODO: make this use less object creations
+        Exprs.Prime(expr, offset)
     } else if(expr is RefExpr) {
         expr
     } else {
         expr.map { op -> offsetNonZeroPrimes(op, offset) }
     }
 }
-
-
-//interface MultiActionTransFunc<S: State, A: Action, P: Prec> {
-//    /**
-//     * For N actions, returns a list of N-long lists, such that each inner
-//     * list is a list of next states, one for each action.
-//     */
-//    fun getSuccStates(state: S, actions: List<A>, prec: P): List<List<S>>
-//}
-
-//
-//class CfaMultiActionTransFunc<S : ExprState, P : Prec>(
-//    val transFunc: MultiActionTransFunc<S, in CfaAction, P>
-//) : MultiActionTransFunc<CfaState<S>, CfaAction, CfaPrec<P>> {
-//
-//    override fun getSuccStates(state: CfaState<S>, actions: List<CfaAction>, prec: CfaPrec<P>): List<List<CfaState<S>>> {
-//        require(actions.isNotEmpty())
-//
-//        val sources = actions.map(CfaAction::getSource)
-//        require(sources.all(state.loc::equals)) { "Location mismatch" }
-//
-//        val targets = actions.map(CfaAction::getTarget)
-//        val target = targets.first()
-//        require(targets.all(target::equals))
-//
-//        val subPrec: P = prec.getPrec(target)
-//        val subState = state.state
-//
-//        val subSuccStates = transFunc.getSuccStates(subState, actions, subPrec)
-//        return subSuccStates.map { nextStates ->
-//            nextStates.map { CfaState.of(target, it) }
-//        }
-//    }
-//}
-//
-
-//class PredMultiActionTransFunction(
-//    val solver: Solver
-//) : MultiActionTransFunc<PredState, ExprAction, PredPrec> {
-//
-//    companion object {
-//        var instanceCounter = 0
-//    }
-//
-//    init {
-//        instanceCounter++
-//    }
-//
-//    private val actLits: ArrayList<ConstDecl<BoolType>> = arrayListOf()
-//    private val litPrefix = "__" + javaClass.simpleName + "_" + instanceCounter + "_"
-//
-//    override fun getSuccStates(state: PredState, actions: List<ExprAction>, prec: PredPrec): List<List<PredState>> {
-//
-//        var maxPrimes = 0
-//        val nextIndexings = arrayListOf<VarIndexing>()
-//        val subExprs = actions.mapIndexed { idx, action ->
-//            val expr = offsetNonZeroPrimes(action.toExpr(), maxPrimes)
-//            val indexing = action.nextIndexing().transform()
-//            for (i in 0 until maxPrimes) {
-//                indexing.incAll()
-//            }
-//            nextIndexings.add(indexing.build())
-//            val primes = PrimeCounter.countPrimes(expr)
-//            val vars = arrayListOf<VarDecl<*>>()
-//            ExprUtils.collectVars(expr, vars)
-//            maxPrimes = vars.map(primes::get).max() ?: 0
-//            return@mapIndexed expr
-//        }.toMutableList()
-//        subExprs.add(state.toExpr())
-//
-//        val fullExpr = AndExpr.create(subExprs)
-//
-//        val preds = prec.preds.toList()
-//        val numActLits = preds.size * actions.size
-//        generateActivationLiterals(numActLits)
-//        val res = arrayListOf<List<PredState>>()
-//
-//        WithPushPop(solver).use { wp ->
-//            solver.add(PathUtils.unfold(fullExpr, VarIndexing.all(0)))
-//            for (indexing in nextIndexings) {
-//                for ((i, pred) in preds.withIndex()) {
-//                    solver.add(BoolExprs.Iff(actLits[i].ref, PathUtils.unfold(pred, indexing)))
-//                }
-//            }
-//            while(solver.check().isSat) {
-//                val model = solver.model
-//
-//                val feedback = ArrayList<Expr<BoolType>>(numActLits+1)
-//                feedback.add(BoolExprs.True())
-//
-//                var litIdx = 0
-//                val newStateList = arrayListOf<PredState>()
-//                for(a in actions.indices) {
-//                    val newPreds = hashSetOf<Expr<BoolType>>()
-//                    for((i, pred) in preds.withIndex()) {
-//                        val lit = actLits[litIdx]
-//                        val eval = model.eval(lit)
-//                        if(eval.isPresent) {
-//                            if(eval.get() == BoolExprs.True()) {
-//                                newPreds.add(pred)
-//                                feedback.add(lit.ref)
-//                            } else {
-//                                newPreds.add(prec.negate(pred))
-//                                feedback.add(BoolExprs.Not(lit.ref))
-//                            }
-//                        }
-//                        litIdx++
-//                    }
-//                    newStateList.add(PredState.of(newPreds))
-//                }
-//                res.add(newStateList)
-//            }
-//        }
-//
-//        return res
-//    }
-//
-//    private fun generateActivationLiterals(n: Int) {
-//        while (actLits.size < n) {
-//            actLits.add(Decls.Const(litPrefix + actLits.size, BoolExprs.Bool()))
-//        }
-//    }
-//
-//}

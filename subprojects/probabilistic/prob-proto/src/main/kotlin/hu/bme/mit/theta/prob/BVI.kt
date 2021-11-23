@@ -7,6 +7,7 @@ import hu.bme.mit.theta.prob.ERGNode.WrappedChoiceNode
 import hu.bme.mit.theta.prob.ERGNode.WrappedStateNode
 import java.util.*
 import kotlin.collections.HashMap
+import kotlin.math.max
 import kotlin.math.min
 
 enum class OptimType {
@@ -27,6 +28,11 @@ fun <T> OptimType.argSelect(m: Map<T, Double>): T?  =
     when(this) {
         OptimType.MAX -> m.maxBy { it.value }?.key
         OptimType.MIN -> m.minBy { it.value }?.key
+    }
+fun <T> OptimType.argSelect(m: List<Pair<T, Double>>): T?  =
+    when(this) {
+        OptimType.MAX -> m.maxBy { it.second }?.first
+        OptimType.MIN -> m.minBy { it.second }?.first
     }
 
 
@@ -61,10 +67,10 @@ fun <S : State, LAbs, LConc> BVI(
     checkedStateNodes: List<StateNode<S, LAbs>>
 ): AbstractionGameCheckResult<S, LAbs, LConc> {
     // TODO: check performance with array conversion
-    var LA = HashMap(LAinit) // Lower approximation for Abstraction node values
-    var LC = HashMap(LCinit) // Lower approximation for Concrete choice node values
-    var UA = HashMap(UAinit) // Upper approximation for Abstraction node values
-    var UC = HashMap(UCinit) // Upper approximation for Concrete choice node values
+    var LA: HashMap<StateNode<S,LAbs>, Double> = HashMap(LAinit) // Lower approximation for Abstraction node values
+    var LC: HashMap<ChoiceNode<S, LConc>, Double> = HashMap(LCinit) // Lower approximation for Concrete choice node values
+    var UA: HashMap<StateNode<S,LAbs>, Double> = HashMap(UAinit) // Upper approximation for Abstraction node values
+    var UC: HashMap<ChoiceNode<S, LConc>, Double> = HashMap(UCinit) // Upper approximation for Concrete choice node values
 
     do {
         // Bellman updates
@@ -77,12 +83,12 @@ fun <S : State, LAbs, LConc> BVI(
             val lEdgeValues = stateNode.outgoingEdges.map { edge ->
                 LC[edge.end]!!
             }
-            LAnext[stateNode] = playerAGoal.select(lEdgeValues)
+            LAnext[stateNode] = playerAGoal.select(lEdgeValues) ?: LAnext[stateNode]
 
             val uEdgeValues = stateNode.outgoingEdges.map { edge ->
                 UC[edge.end]!!
             }
-            UAnext[stateNode] = playerAGoal.select(uEdgeValues)
+            UAnext[stateNode] = playerAGoal.select(uEdgeValues) ?: LAnext[stateNode]
         }
 
         for (choiceNode in LC.keys) {
@@ -96,6 +102,11 @@ fun <S : State, LAbs, LConc> BVI(
             }
             UCnext[choiceNode] = playerCGoal.select(uEdgeValues)
         }
+
+        LA = LAnext
+        LC = LCnext
+        UA = UAnext
+        UC = UCnext
 
         // Computing MSECs for deflation
         val stateNodeIndices = hashMapOf<StateNode<S, LAbs>, Int>()
@@ -170,7 +181,11 @@ fun <S : State, LAbs, LConc> BVI(
         }
 
         val errorOnCheckedNodes = checkedStateNodes.sumByDouble { Math.abs(UA[it]!! - LA[it]!!) }
-    } while(errorOnCheckedNodes > threshold)
+        val largestStateError = game.stateNodes.map { UA[it]!!-LA[it]!! }.max() ?: 0.0
+        val largestChoiceError = game.concreteChoiceNodes.map { UC[it]!!-LC[it]!! }.max() ?: 0.0
+        val largestError = max(largestStateError, largestChoiceError)
+//    } while(errorOnCheckedNodes > threshold)
+    } while(largestError > threshold)
 
     return AbstractionGameCheckResult(avgMap(LA, UA), avgMap(LC, UC))
 }
