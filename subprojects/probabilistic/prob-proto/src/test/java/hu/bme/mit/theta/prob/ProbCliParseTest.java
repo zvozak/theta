@@ -59,7 +59,7 @@ public class ProbCliParseTest {
 	}
 
 	@Test
-	public void test() throws URISyntaxException, IOException {
+	public void test() throws IOException {
 		ArchitectureConfig.arithmetic = ArchitectureConfig.ArithmeticType.efficient;
 		ArchitectureConfig.multiThreading = false;
 		FrontendMetadata.clear();
