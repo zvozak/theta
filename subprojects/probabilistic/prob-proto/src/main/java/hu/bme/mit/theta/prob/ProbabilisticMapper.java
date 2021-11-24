@@ -1,6 +1,5 @@
 package hu.bme.mit.theta.prob;
 
-import com.ibm.icu.impl.Pair;
 import hu.bme.mit.theta.core.decl.VarDecl;
 import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.anytype.RefExpr;
@@ -9,6 +8,7 @@ import hu.bme.mit.theta.xcfa.model.XcfaEdge;
 import hu.bme.mit.theta.xcfa.model.XcfaLabel;
 import hu.bme.mit.theta.xcfa.model.XcfaProcedure;
 import hu.bme.mit.theta.xcfa.passes.procedurepass.ProcedurePass;
+import kotlin.Pair;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -46,8 +46,8 @@ public class ProbabilisticMapper extends ProcedurePass {
 		final Expr<?> b = params.get(2);
 		final Expr<?> sum = Add(a, b);
 		return Stmt(new ProbStmt(new EnumeratedDistribution(List.of(
-				Pair.of(Assign(var, Int(0)), Div(a, sum)),
-				Pair.of(Assign(var, Int(1)), Div(b, sum))
+				new Pair(Assign(var, Int(0)), Div(a, sum)),
+				new Pair(Assign(var, Int(1)), Div(b, sum))
 		))));
 	}
 
