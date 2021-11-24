@@ -1,5 +1,5 @@
 /*
- *  Copyright 2017 Budapest University of Technology and Economics
+ *  Copyright 2021 Budapest University of Technology and Economics
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -34,5 +34,11 @@ public interface StmtVisitor<P, R> {
 	R visit(OrtStmt stmt, P param);
 
 	R visit(LoopStmt stmt, P param);
+
+	<DeclType extends Type> R visit(PushStmt<DeclType> stmt, P param);
+
+	<DeclType extends Type> R visit(PopStmt<DeclType> stmt, P param);
+
+	R visit(IfStmt stmt, P param);
 
 }

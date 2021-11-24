@@ -15,22 +15,22 @@
  */
 package hu.bme.mit.theta.analysis.algorithm.cegar;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
-import java.util.concurrent.TimeUnit;
-
 import com.google.common.base.Stopwatch;
-
 import hu.bme.mit.theta.analysis.Action;
 import hu.bme.mit.theta.analysis.Prec;
 import hu.bme.mit.theta.analysis.State;
 import hu.bme.mit.theta.analysis.algorithm.ARG;
 import hu.bme.mit.theta.analysis.algorithm.SafetyChecker;
 import hu.bme.mit.theta.analysis.algorithm.SafetyResult;
+import hu.bme.mit.theta.analysis.algorithm.runtimecheck.ArgCexCheckHandler;
 import hu.bme.mit.theta.common.Utils;
 import hu.bme.mit.theta.common.logging.Logger;
-import hu.bme.mit.theta.common.logging.NullLogger;
 import hu.bme.mit.theta.common.logging.Logger.Level;
+import hu.bme.mit.theta.common.logging.NullLogger;
+
+import java.util.concurrent.TimeUnit;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Counterexample-Guided Abstraction Refinement (CEGAR) loop implementation,
@@ -81,7 +81,14 @@ public final class CegarChecker<S extends State, A extends Action, P extends Pre
 			abstractorTime += stopwatch.elapsed(TimeUnit.MILLISECONDS) - abstractorStartTime;
 			logger.write(Level.MAINSTEP, "| Checking abstraction done, result: %s%n", abstractorResult);
 
+			// logger.write(Level.INFO, "Printing ARG..." + System.lineSeparator());
+			// Graph g = ArgVisualizer.getDefault().visualize(arg);
+			// logger.write(Level.INFO, GraphvizWriter.getInstance().writeString(g) + System.lineSeparator());
+
 			if (abstractorResult.isUnsafe()) {
+				ArgCexCheckHandler.instance.checkAndStop(arg, prec);
+
+				P lastPrec = prec;
 				logger.write(Level.MAINSTEP, "| Refining abstraction...%n");
 				final long refinerStartTime = stopwatch.elapsed(TimeUnit.MILLISECONDS);
 				refinerResult = refiner.refine(arg, prec);
@@ -91,6 +98,13 @@ public final class CegarChecker<S extends State, A extends Action, P extends Pre
 				if (refinerResult.isSpurious()) {
 					prec = refinerResult.asSpurious().getRefinedPrec();
 				}
+
+				if(lastPrec.equals(prec)) {
+					logger.write(Level.MAINSTEP, "! Precision did NOT change in this iteration"+System.lineSeparator());
+				} else {
+					logger.write(Level.MAINSTEP, "! Precision DID change in this iteration"+System.lineSeparator());
+				}
+
 			}
 
 		} while (!abstractorResult.isSafe() && !refinerResult.isUnsafe());
