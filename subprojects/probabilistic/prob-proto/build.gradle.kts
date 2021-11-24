@@ -1,5 +1,6 @@
 plugins {
     id("kotlin-common")
+    id("cli-tool")
 }
 
 dependencies {
@@ -9,4 +10,10 @@ dependencies {
     implementation(project(":theta-analysis"))
     implementation(project(":theta-cfa-analysis"))
     implementation(project(":theta-solver-z3"))
+    implementation(project(":theta-xcfa"))
+    implementation(project(":theta-c-frontend"))
+}
+
+application {
+    mainClassName = "hu.bme.mit.theta.prob.ProbCli"
 }
