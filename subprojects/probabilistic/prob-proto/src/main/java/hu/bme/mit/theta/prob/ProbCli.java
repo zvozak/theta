@@ -34,15 +34,10 @@ import hu.bme.mit.theta.frontend.transformation.model.statements.CStatement;
 import hu.bme.mit.theta.xcfa.model.XCFA;
 import hu.bme.mit.theta.xcfa.model.utils.FrontendXcfaBuilder;
 import hu.bme.mit.theta.xcfa.passes.XcfaPassManager;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.AddHavocRange;
 import hu.bme.mit.theta.xcfa.passes.procedurepass.CallsToFinalLocs;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.CallsToHavocs;
 import hu.bme.mit.theta.xcfa.passes.procedurepass.EmptyEdgeRemovalPass;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.HavocPromotion;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.NoReadVarRemovalPass;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.PorPass;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.SimpleLbePass;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.VerifierFunctionsToLabels;
+import hu.bme.mit.theta.xcfa.passes.procedurepass.RemoveDeadEnds;
+import hu.bme.mit.theta.xcfa.passes.procedurepass.SimplifyExprs;
 import hu.bme.mit.theta.xcfa.passes.processpass.AnalyzeCallGraph;
 import hu.bme.mit.theta.xcfa.passes.processpass.FunctionInlining;
 import hu.bme.mit.theta.xcfa.passes.xcfapass.RemoveUnusedGlobals;
@@ -50,13 +45,15 @@ import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 
 import static com.google.common.base.Preconditions.checkState;
 
 public class ProbCli {
-	private static final String JAR_NAME = "theta-xcfa-cli.jar";
+	private static final String JAR_NAME = "theta-prob-cli.jar";
 	private final String[] args;
 
 	//////////// CONFIGURATION OPTIONS BEGIN ////////////
@@ -68,6 +65,12 @@ public class ProbCli {
 
 	@Parameter(names = "--arithmetic-type", description = "Arithmetic type to use when building")
 	ArchitectureConfig.ArithmeticType arithmeticType = ArchitectureConfig.ArithmeticType.efficient;
+
+	@Parameter(names = "--parse-only", description = "Do not run analysis, only parse program")
+	boolean parseOnly = false;
+
+	@Parameter(names = "--visualize-cfa", description = "Visualize CFA in dot format to the specified path")
+	File cfaVis = null;
 
 	@Parameter(names = "--version", description = "Display version", help = true)
 	boolean versionInfo = false;
@@ -133,18 +136,27 @@ public class ProbCli {
 		}
 
 		try {
-			registerPasses();
+			registerProbabilisticPasses();
 			XCFA xcfa = xcfaBuilder.build();
 			CFA cfa = xcfa.createCFA();
-			handleCfa(cfa);
-			logger.write(Logger.Level.INFO, "Analysis done in " + sw.elapsed().toMillis() + "ms");
+			if(cfaVis != null) {
+				final String s = GraphvizWriter.getInstance().writeString(CfaVisualizer.visualize(cfa));
+				try(BufferedWriter bw = new BufferedWriter(new FileWriter(cfaVis))) {
+					bw.write(s);
+				}
+			}
+			logger.write(Logger.Level.INFO, "Parsing done at " + sw.elapsed().toMillis() + "ms");
+			if (!parseOnly) {
+				handleCfa(cfa);
+				logger.write(Logger.Level.INFO, "Analysis done at " + sw.elapsed().toMillis() + "ms");
+			}
 		} catch (final Throwable ex) {
 			ex.printStackTrace();
-			logger.write(Logger.Level.INFO, "Analysis exited unsuccessfully after " + sw.elapsed().toMillis() + "ms");
+			logger.write(Logger.Level.INFO, "Analysis exited unsuccessfully at " + sw.elapsed().toMillis() + "ms");
 		}
 	}
 
-	private void registerPasses() {
+	public static void registerProbabilisticPasses() {
 		// Remove presets
 		XcfaPassManager.clearXCFAPasses();
 		XcfaPassManager.clearProcessPasses();
@@ -169,15 +181,14 @@ public class ProbCli {
 //		XcfaPassManager.addProcedurePass(new CallsToHavocs());				// If traditional havocs (__VERIFIER_nondet_<type>()) are needed, uncomment [maps functions]
 //		XcfaPassManager.addProcedurePass(new AddHavocRange());				// If traditional havocs (__VERIFIER_nondet_<type>()) are needed, uncomment [adds range constraint]
 
-//		XcfaPassManager.addProcedurePass(new SimplifyExprs());				// Simplifies expressions
+		XcfaPassManager.addProcedurePass(new SimplifyExprs());				// Simplifies expressions
 //		XcfaPassManager.addProcedurePass(new UnusedVarRemovalPass());		// Variables with no usages are removed
 //		XcfaPassManager.addProcedurePass(new NoReadVarRemovalPass());		// Variables without a consumer are removed
-//		XcfaPassManager.addProcedurePass(new RemoveDeadEnds());				// Remove paths that do not lead to an error or final location
-//		XcfaPassManager.addProcedurePass(new EmptyEdgeRemovalPass());		// Removes empty edges by merging them
+		XcfaPassManager.addProcedurePass(new RemoveUnreachable());			// Remove paths that are unreachable
+		XcfaPassManager.addProcedurePass(new EmptyEdgeRemovalPass());		// Removes empty edges by merging them
 	}
 
 	private void handleCfa(final CFA cfa) {
-		GraphvizWriter.getInstance().writeString(CfaVisualizer.visualize(cfa));
 	}
 
 }
