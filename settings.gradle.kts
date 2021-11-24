@@ -27,7 +27,7 @@ include(
         "xsts/xsts-analysis",
         "xsts/xsts-cli",
 
-        "probabilistic/prob-proto"
+        "probabilistic/prob-proto",
 
         "solver/solver",
         "solver/solver-z3",
