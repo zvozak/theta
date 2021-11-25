@@ -183,4 +183,5 @@ public abstract class ExplState extends Valuation implements ExprState {
 	private static class TopLazyHolder {
 		static final ExplState INSTANCE = new NonBottom(ImmutableValuation.empty());
 	}
+
 }

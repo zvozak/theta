@@ -15,13 +15,13 @@
  */
 package hu.bme.mit.theta.common;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 public final class Utils {
 

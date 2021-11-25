@@ -81,7 +81,11 @@ public final class CoreDslManager {
 
 	public String writeStmt(final Stmt stmt) {
 		checkNotNull(stmt);
-		return stmt.accept(new StmtWriter(), null);
+		try {
+			return stmt.accept(new StmtWriter(), null);
+		} catch(UnsupportedOperationException e) {
+			return stmt.toString();
+		}
 	}
 
 	////

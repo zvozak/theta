@@ -8,6 +8,7 @@ import hu.bme.mit.theta.analysis.expr.ExprState;
 import hu.bme.mit.theta.analysis.expr.ExprTraceUtils;
 import hu.bme.mit.theta.analysis.expr.StmtAction;
 import hu.bme.mit.theta.common.Utils;
+import hu.bme.mit.theta.common.container.Containers;
 import hu.bme.mit.theta.core.model.ImmutableValuation;
 import hu.bme.mit.theta.core.model.Valuation;
 import hu.bme.mit.theta.core.stmt.AssumeStmt;
@@ -18,15 +19,17 @@ import hu.bme.mit.theta.core.utils.ExprSimplifier;
 import hu.bme.mit.theta.core.utils.ExprUtils;
 import hu.bme.mit.theta.core.utils.PathUtils;
 import hu.bme.mit.theta.core.utils.SpState;
-import hu.bme.mit.theta.core.utils.VarIndexing;
 import hu.bme.mit.theta.core.utils.WpState;
+import hu.bme.mit.theta.core.utils.indexings.VarIndexing;
+import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory;
 import hu.bme.mit.theta.solver.Solver;
+import hu.bme.mit.theta.solver.UCSolver;
 import hu.bme.mit.theta.solver.utils.WithPushPop;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import hu.bme.mit.theta.common.container.Containers;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -45,18 +48,18 @@ import static java.util.stream.Collectors.toList;
  */
 public class ExprTraceUCBChecker implements ExprTraceChecker<ItpRefutation>  {
 
-    private final Solver solver;
+    private final UCSolver solver;
     private final Expr<BoolType> init;
     private final Expr<BoolType> target;
 
-    private ExprTraceUCBChecker(final Expr<BoolType> init, final Expr<BoolType> target, final Solver solver) {
+    private ExprTraceUCBChecker(final Expr<BoolType> init, final Expr<BoolType> target, final UCSolver solver) {
         this.solver = checkNotNull(solver);
         this.init = checkNotNull(init);
         this.target = checkNotNull(target);
     }
 
     public static ExprTraceUCBChecker create(
-        final Expr<BoolType> init, final Expr<BoolType> target, final Solver solver
+        final Expr<BoolType> init, final Expr<BoolType> target, final UCSolver solver
     ) {
         return new ExprTraceUCBChecker(init, target, solver);
     }
@@ -73,12 +76,12 @@ public class ExprTraceUCBChecker implements ExprTraceChecker<ItpRefutation>  {
         }
     }
 
-private ExprTraceStatus<ItpRefutation> check2(final Trace<? extends ExprState, ? extends StmtAction> trace) {
+    private ExprTraceStatus<ItpRefutation> check2(final Trace<? extends ExprState, ? extends StmtAction> trace) {
         final var ftrace = flattenTrace(trace);
         final int stateCount = trace.getStates().size();
 
         final List<VarIndexing> indexings = new ArrayList<>(stateCount);
-        indexings.add(VarIndexing.all(0));
+        indexings.add(VarIndexingFactory.indexing(0));
 
         final Valuation model;
         final Collection<Expr<BoolType>> unsatCore;
@@ -180,7 +183,7 @@ private ExprTraceStatus<ItpRefutation> check2(final Trace<? extends ExprState, ?
                 /* Add the negated of the above expression as the new predicate */
                 predicates.add(
                     ExprSimplifier.simplify(
-                        Not(And(Containers.createSet(predicate))),
+                        Not(And(new HashSet<>(predicate))),
                         ImmutableValuation.empty()
                     )
                 );
@@ -224,8 +227,8 @@ private ExprTraceStatus<ItpRefutation> check2(final Trace<? extends ExprState, ?
         for(var i = 1; i < stateCount; i++) {
             var initStream =
                 (i == 1)
-                ? ExprUtils.getConjuncts(init).stream().map(AssumeStmt::of)
-                : Stream.<AssumeStmt>empty();
+                    ? ExprUtils.getConjuncts(init).stream().map(AssumeStmt::of)
+                    : Stream.<AssumeStmt>empty();
 
             var stateStream = ExprUtils.getConjuncts(trace.getState(i - 1).toExpr()).stream().map(AssumeStmt::of);
 
@@ -233,11 +236,11 @@ private ExprTraceStatus<ItpRefutation> check2(final Trace<? extends ExprState, ?
 
             var targetStream =
                 (i == stateCount - 1)
-                ? Stream.concat(
+                    ? Stream.concat(
                     ExprUtils.getConjuncts(trace.getState(i).toExpr()).stream().map(AssumeStmt::of),
                     ExprUtils.getConjuncts(target).stream().map(AssumeStmt::of)
                 )
-                : Stream.<AssumeStmt>empty();
+                    : Stream.<AssumeStmt>empty();
 
             flattenedActions.add(
                 UCBAction.of(

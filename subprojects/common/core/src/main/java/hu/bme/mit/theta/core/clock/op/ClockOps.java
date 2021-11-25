@@ -1,5 +1,5 @@
 /*
- *  Copyright 2017 Budapest University of Technology and Economics
+ *  Copyright 2021 Budapest University of Technology and Economics
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -15,12 +15,19 @@
  */
 package hu.bme.mit.theta.core.clock.op;
 
-import static hu.bme.mit.theta.core.type.rattype.RatExprs.Rat;
-
 import hu.bme.mit.theta.core.clock.constr.ClockConstr;
 import hu.bme.mit.theta.core.clock.constr.ClockConstrs;
 import hu.bme.mit.theta.core.decl.Decl;
 import hu.bme.mit.theta.core.decl.VarDecl;
+import hu.bme.mit.theta.core.stmt.AssignStmt;
+import hu.bme.mit.theta.core.stmt.AssumeStmt;
+import hu.bme.mit.theta.core.stmt.HavocStmt;
+import hu.bme.mit.theta.core.stmt.NonDetStmt;
+import hu.bme.mit.theta.core.stmt.OrtStmt;
+import hu.bme.mit.theta.core.stmt.SequenceStmt;
+import hu.bme.mit.theta.core.stmt.SkipStmt;
+import hu.bme.mit.theta.core.stmt.Stmt;
+import hu.bme.mit.theta.core.stmt.StmtVisitor;
 import hu.bme.mit.theta.core.stmt.*;
 import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.Type;
@@ -31,6 +38,8 @@ import hu.bme.mit.theta.core.type.inttype.IntLitExpr;
 import hu.bme.mit.theta.core.type.rattype.RatLitExpr;
 import hu.bme.mit.theta.core.type.rattype.RatType;
 import hu.bme.mit.theta.core.utils.TypeUtils;
+
+import static hu.bme.mit.theta.core.type.rattype.RatExprs.Rat;
 
 public final class ClockOps {
 
@@ -104,6 +113,17 @@ public final class ClockOps {
 
 		@Override
 		public ClockOp visit(LoopStmt stmt, Void param) { throw new UnsupportedOperationException(); }
+
+		@Override
+		public <DeclType extends Type> ClockOp visit(PushStmt<DeclType> stmt, Void param) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public <DeclType extends Type> ClockOp visit(PopStmt<DeclType> stmt, Void param) {
+			throw new UnsupportedOperationException();
+		}
+		public ClockOp visit(IfStmt stmt, Void param) { throw new UnsupportedOperationException(); }
 
 		@Override
 		public <DeclType extends Type> ClockOp visit(final AssignStmt<DeclType> stmt, final Void param) {

@@ -4,8 +4,7 @@ include(
         "common/analysis",
         "common/common",
         "common/core",
-        "common/solver",
-        "common/solver-z3",
+        "common/c-frontend",
 
         "cfa/cfa",
         "cfa/cfa-analysis",
@@ -15,6 +14,11 @@ include(
         "sts/sts-analysis",
         "sts/sts-cli",
 
+        "xcfa/xcfa",
+        "xcfa/xcfa-analysis",
+        "xcfa/xcfa-cli",
+        "xcfa/cat",
+
         "xta/xta",
         "xta/xta-analysis",
         "xta/xta-cli",
@@ -23,7 +27,12 @@ include(
         "xsts/xsts-analysis",
         "xsts/xsts-cli",
 
-        "probabilistic/prob-proto"
+        "probabilistic/prob-proto",
+
+        "solver/solver",
+        "solver/solver-z3",
+        "solver/solver-smtlib",
+        "solver/solver-smtlib-cli"
 )
 
 for (project in rootProject.children) {

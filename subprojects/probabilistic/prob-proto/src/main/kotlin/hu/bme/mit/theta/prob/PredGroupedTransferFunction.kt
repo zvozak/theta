@@ -19,11 +19,13 @@ import hu.bme.mit.theta.core.type.booltype.BoolExprs.And
 import hu.bme.mit.theta.core.type.booltype.BoolExprs.Not
 import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.*
+import hu.bme.mit.theta.core.utils.indexings.VarIndexing
+import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 
 fun Stmt.unfold(): StmtUnfoldResult =
-    StmtUtils.toExpr(this, VarIndexing.all(0))
+    StmtUtils.toExpr(this, VarIndexingFactory.indexing(0))
 
 class PredGroupedTransferFunction(
     val solver: Solver
@@ -64,7 +66,7 @@ class PredGroupedTransferFunction(
         generateActivationLiterals(numActLits)
         val res = arrayListOf<PredState>()
         WithPushPop(solver).use {
-            solver.add(PathUtils.unfold(fullExpr, VarIndexing.all(0)))
+            solver.add(PathUtils.unfold(fullExpr, VarIndexingFactory.indexing(0)))
             for ((i, pred) in preds.withIndex()) {
                 solver.add(BoolExprs.Iff(actLits[i].ref, PathUtils.unfold(pred, unfoldResult.indexing)))
             }
@@ -131,7 +133,7 @@ class PredGroupedTransferFunction(
         val res = arrayListOf<List<PredState>>()
 
         WithPushPop(solver).use { wp ->
-            solver.add(PathUtils.unfold(fullExpr, VarIndexing.all(0)))
+            solver.add(PathUtils.unfold(fullExpr, VarIndexingFactory.indexing(0)))
             var litIdx = 0
             for (indexing in nextIndexings) {
                 for (pred in preds) {
