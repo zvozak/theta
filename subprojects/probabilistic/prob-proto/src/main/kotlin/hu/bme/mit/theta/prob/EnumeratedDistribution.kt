@@ -1,5 +1,7 @@
 package hu.bme.mit.theta.prob
 
+import hu.bme.mit.theta.core.stmt.Stmt
+
 // TODO: better solution for storing the statements leading to the state instead of a metadata field
 class EnumeratedDistribution<D, M>(
     val pmf: Map<D, Double>,

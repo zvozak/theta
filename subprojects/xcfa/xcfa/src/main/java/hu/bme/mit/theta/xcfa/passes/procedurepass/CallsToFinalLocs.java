@@ -27,9 +27,15 @@ import java.util.List;
 import java.util.Optional;
 
 public class CallsToFinalLocs extends ProcedurePass {
-	private static final List<String> errorFunc = List.of("reach_error");
-	private static final List<String> abortFunc = List.of("abort", "exit");
+	private List<String> errorFunc = List.of("reach_error");
+	private List<String> abortFunc = List.of("abort", "exit");
 	public boolean postInlining = false;
+
+	public CallsToFinalLocs(){}
+	public CallsToFinalLocs(final List<String> abortFunc, final List<String> errorFunc) {
+		this.abortFunc = abortFunc;
+		this.errorFunc = errorFunc;
+	}
 
 	private int nameCounter = 0;
 	@Override

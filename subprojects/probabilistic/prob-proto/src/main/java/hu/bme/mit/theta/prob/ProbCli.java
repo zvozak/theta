@@ -35,6 +35,7 @@ import hu.bme.mit.theta.xcfa.model.XCFA;
 import hu.bme.mit.theta.xcfa.model.utils.FrontendXcfaBuilder;
 import hu.bme.mit.theta.xcfa.passes.XcfaPassManager;
 import hu.bme.mit.theta.xcfa.passes.procedurepass.CallsToFinalLocs;
+import hu.bme.mit.theta.xcfa.passes.procedurepass.CallsToHavocs;
 import hu.bme.mit.theta.xcfa.passes.procedurepass.EmptyEdgeRemovalPass;
 import hu.bme.mit.theta.xcfa.passes.procedurepass.RemoveDeadEnds;
 import hu.bme.mit.theta.xcfa.passes.procedurepass.SimplifyExprs;
@@ -49,6 +50,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
+import java.util.List;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -175,10 +177,12 @@ public class ProbCli {
 
 //		XcfaPassManager.addProcedurePass(new FpFunctionsToExprs());			// If floating point functions are needed, uncomment
 
-		XcfaPassManager.addProcedurePass(new CallsToFinalLocs());			// map abort, exit and reach_error to final and error locations
+		XcfaPassManager.addProcedurePass(new CallsToFinalLocs(
+				List.of("abort", "exit"),
+				List.of("reach_error")));									// map abort, exit and reach_error to final and error locations
 		XcfaPassManager.addProcedurePass(new ProbabilisticMapper());		// map probabilistic functions to ProbStmts
 
-//		XcfaPassManager.addProcedurePass(new CallsToHavocs());				// If traditional havocs (__VERIFIER_nondet_<type>()) are needed, uncomment [maps functions]
+		XcfaPassManager.addProcedurePass(new CallsToHavocs());				// If traditional havocs (__VERIFIER_nondet_<type>()) are needed, uncomment [maps functions]
 //		XcfaPassManager.addProcedurePass(new AddHavocRange());				// If traditional havocs (__VERIFIER_nondet_<type>()) are needed, uncomment [adds range constraint]
 
 		XcfaPassManager.addProcedurePass(new SimplifyExprs());				// Simplifies expressions
