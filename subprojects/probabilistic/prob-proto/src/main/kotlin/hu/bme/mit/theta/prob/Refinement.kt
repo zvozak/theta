@@ -2,6 +2,8 @@ package hu.bme.mit.theta.prob
 
 import hu.bme.mit.theta.analysis.Prec
 import hu.bme.mit.theta.analysis.State
+import hu.bme.mit.theta.analysis.expl.ExplPrec
+import hu.bme.mit.theta.analysis.expl.ExplState
 import hu.bme.mit.theta.analysis.expr.ExprAction
 import hu.bme.mit.theta.analysis.expr.ExprState
 import hu.bme.mit.theta.analysis.expr.StmtAction
@@ -12,12 +14,19 @@ import hu.bme.mit.theta.analysis.waitlist.Waitlist
 import hu.bme.mit.theta.cfa.analysis.CfaAction
 import hu.bme.mit.theta.cfa.analysis.CfaState
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
+import hu.bme.mit.theta.core.decl.VarDecl
 import hu.bme.mit.theta.core.stmt.NonDetStmt
+import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
+import hu.bme.mit.theta.core.type.booltype.BoolType
+import hu.bme.mit.theta.core.utils.ExprUtils
+import hu.bme.mit.theta.core.utils.ExprUtils.collectVars
 import hu.bme.mit.theta.core.utils.WpState
 import hu.bme.mit.theta.prob.AbstractionGame.*
+import hu.bme.mit.theta.solver.ItpSolver
 import java.util.*
 import kotlin.collections.HashSet
+import kotlin.math.max
 
 typealias StateNodeValues<S, LAbs> = Map<StateNode<S, LAbs>, Double>
 typealias ChoiceNodeValues<S, LConc> = Map<ChoiceNode<S, LConc>, Double>
@@ -83,90 +92,123 @@ object nearestRefinableStateSelector: RefinableStateSelector {
 interface GameAbstractionRefiner<S: State, P: Prec, LAbs, LConc> {
     fun refine(
         game: AbstractionGame<S, LAbs, LConc>,
-        stateToRefine: StateNode<S, LAbs>,
-        origPrec: P
+        stateToRefine: StateNode<S,LAbs>,
+        origPrecision: GlobalCfaPrec<PredPrec>,
+        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
+        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
     ): P
 }
 
-fun <S: ExprState, LAbs: StmtAction, LConc> wprefineGameAbstraction(
-    game: AbstractionGame<S, LAbs, LConc>,
-    stateToRefine: StateNode<S,LAbs>,
-    origPrecision: GlobalCfaPrec<PredPrec>,
-    VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
-    VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
-): GlobalCfaPrec<PredPrec> {
 
-    require(!stateToRefine.outgoingEdges.isEmpty())
+object ExplRefiner {
+    fun <LAbs : StmtAction, LConc> wprefineGameAbstraction(
+        game: AbstractionGame<CfaState<ExplState>, LAbs, LConc>,
+        stateToRefine: StateNode<CfaState<ExplState>, LAbs>,
+        origPrecision: GlobalCfaPrec<ExplPrec>,
+        VAmin: StateNodeValues<CfaState<ExplState>, LAbs>, VAmax: StateNodeValues<CfaState<ExplState>, LAbs>,
+        VCmin: ChoiceNodeValues<CfaState<ExplState>, LConc>, VCmax: ChoiceNodeValues<CfaState<ExplState>, LConc>
+    ): GlobalCfaPrec<ExplPrec> {
 
-    val maxEdge = stateToRefine.outgoingEdges.maxBy { VCmax[it.end]!! }!!
-    val minEdge = stateToRefine.outgoingEdges.minBy { VCmin[it.end]!! }!!
+        require(stateToRefine.outgoingEdges.isNotEmpty())
 
-    // TODO: Allow LBE
-    require(maxEdge.label.stmts.size == 1 && minEdge.label.stmts.size == 1)
-    val maxStmt = maxEdge.label.stmts.first()
+        val maxEdge = stateToRefine.outgoingEdges.maxBy { VCmax[it.end]!! }!!
+        val minEdge = stateToRefine.outgoingEdges.minBy { VCmin[it.end]!! }!!
 
-    val wpPreds = if(maxStmt is ProbStmt) {
-        // We assume that a probabilistic location cannot be non-deterministic at the same time
-        // This works for the PCFA formalism, but won't be true in general
-        require(maxEdge.end.outgoingEdges.size == 1)
-        val wps = maxEdge.end.outgoingEdges.first().end.metadata.flatMap { (resultingState, stmtList) ->
-            stmtList.map { stmt ->
-                val wpstate = WpState.of(resultingState.state.toExpr())
-                return@map wpstate.wep(stmt).expr
+        // TODO: Allow LBE
+        require(maxEdge.label.stmts.size == 1 && minEdge.label.stmts.size == 1)
+        val maxStmt = maxEdge.label.stmts.first()
+
+        val wpVars = if (maxStmt is ProbStmt) {
+            // We assume that a probabilistic location cannot be non-deterministic at the same time
+            // This works for the PCFA formalism, but won't be true in general
+            require(maxEdge.end.outgoingEdges.size == 1)
+            val wps = maxEdge.end.outgoingEdges.first().end.metadata.flatMap { (resultingState, stmtList) ->
+                stmtList.flatMap { stmt ->
+                    val wpstate = WpState.of(resultingState.state.toExpr())
+                    val wepexpr = wpstate.wep(stmt).expr
+                    arrayListOf<VarDecl<*>>().also { collectVars(wepexpr, it) }
+                }
             }
+            wps.toSet()
+        } else if (maxStmt is NonDetStmt) {
+            TODO("Not supported yet")
+        } else {
+            val targetState = maxEdge.end.outgoingEdges.first().end.pmf.keys.first().state
+            val wpstate = WpState.of(targetState.toExpr())
+            val wepexpr = wpstate.wep(maxStmt).expr
+            arrayListOf<VarDecl<*>>().also { collectVars(wepexpr, it) }
         }
-        wps.flatMap(ExprSplitters.atoms()::apply).toSet()
-    } else if(maxStmt is NonDetStmt) {
-        TODO("Not supported yet")
-    } else {
-        val targetState = maxEdge.end.outgoingEdges.first().end.pmf.keys.first().state
-        val wps = WpState.of(targetState.toExpr())
-        ExprSplitters.atoms().apply(wps.wep(maxStmt).expr).toSet()
-    }
 
-    val newSubPrec = origPrecision.prec.join(PredPrec.of(wpPreds))
-    return GlobalCfaPrec.create(newSubPrec)
+        val newSubPrec = origPrecision.prec.join(ExplPrec.of(wpVars))
+        return GlobalCfaPrec.create(newSubPrec)
+    }
 }
 
-class ItpGameAbstractionRefiner<S: ExprState, P: Prec, A: ExprAction, LConc>:
-        GameAbstractionRefiner<S, P, A, LConc> {
+object PredRefiner {
+    fun <S : ExprState, LAbs : StmtAction, LConc> wprefineGameAbstraction(
+        game: AbstractionGame<S, LAbs, LConc>,
+        stateToRefine: StateNode<S, LAbs>,
+        origPrecision: GlobalCfaPrec<PredPrec>,
+        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
+        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
+    ): GlobalCfaPrec<PredPrec> {
+
+        require(stateToRefine.outgoingEdges.isNotEmpty())
+
+        val maxEdge = stateToRefine.outgoingEdges.maxBy { VCmax[it.end]!! }!!
+        val minEdge = stateToRefine.outgoingEdges.minBy { VCmin[it.end]!! }!!
+
+        // TODO: Allow LBE
+        require(maxEdge.label.stmts.size == 1 && minEdge.label.stmts.size == 1)
+        val maxStmt = maxEdge.label.stmts.first()
+
+        val wpPreds = if (maxStmt is ProbStmt) {
+            // We assume that a probabilistic location cannot be non-deterministic at the same time
+            // This works for the PCFA formalism, but won't be true in general
+            require(maxEdge.end.outgoingEdges.size == 1)
+            val wps = maxEdge.end.outgoingEdges.first().end.metadata.flatMap { (resultingState, stmtList) ->
+                stmtList.map { stmt ->
+                    val wpstate = WpState.of(resultingState.state.toExpr())
+                    return@map wpstate.wep(stmt).expr
+                }
+            }
+            wps.flatMap(ExprSplitters.atoms()::apply).toSet()
+        } else if (maxStmt is NonDetStmt) {
+            TODO("Not supported yet")
+        } else {
+            val targetState = maxEdge.end.outgoingEdges.first().end.pmf.keys.first().state
+            val wps = WpState.of(targetState.toExpr())
+            ExprSplitters.atoms().apply(wps.wep(maxStmt).expr).toSet()
+        }
+
+        val newSubPrec = origPrecision.prec.join(PredPrec.of(wpPreds))
+        return GlobalCfaPrec.create(newSubPrec)
+    }
+}
+
+class ItpGameAbstractionRefiner<S: ExprState, P: Prec, LAbs: Stmt, LConc>(
+    val solver: ItpSolver
+):
+        GameAbstractionRefiner<S, P, LAbs, LConc> {
     override fun refine(
-        game: AbstractionGame<S, A, LConc>,
-        stateToRefine: StateNode<S, A>,
-        origPrec: P
+        game: AbstractionGame<S, LAbs, LConc>,
+        stateToRefine: StateNode<S,LAbs>,
+        origPrecision: GlobalCfaPrec<PredPrec>,
+        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
+        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
     ): P {
+        require(stateToRefine.outgoingEdges.isNotEmpty())
+
+        val maxEdge = stateToRefine.outgoingEdges.maxBy { VCmax[it.end]!! }!!
+        val minEdge = stateToRefine.outgoingEdges.minBy { VCmin[it.end]!! }!!
+
+        if(maxEdge.label is ProbStmt) {
+
+        }
+
         TODO("Not yet implemented")
     }
 }
-
-/**
- * Game Abstraction refiner
- */
-class WpGARefiner<A: StmtAction, LConc>:
-        GameAbstractionRefiner<PredState, PredPrec, A, LConc> {
-    override fun refine(
-        game: AbstractionGame<PredState, A, LConc>,
-        stateToRefine: StateNode<PredState, A>,
-        origPrec: PredPrec
-    ): PredPrec {
-        TODO("Not yet implemented")
-    }
-}
-
-//class GlobalCfaPrecRefiner<S: ExprState, P: Prec, LAbs, LConc>(
-//    val subRefiner: GameAbstractionRefiner<S, P, LAbs, LConc>
-//): GameAbstractionRefiner<CfaState<S>, GlobalCfaPrec<P>, LAbs, LConc> {
-//    override fun refine(
-//        game: AbstractionGame<CfaState<S>, LAbs, LConc>,
-//        stateToRefine: StateNode<CfaState<S>, LAbs>,
-//        origPrec: GlobalCfaPrec<P>
-//    ): GlobalCfaPrec<P> {
-//        return GlobalCfaPrec.create(subRefiner.refine(
-//            game, stateToRefine,
-//        ))
-//    }
-//
-//}
 
 interface PrecRefiner<P: Prec> {
 
