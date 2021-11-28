@@ -2,6 +2,7 @@ package hu.bme.mit.theta.prob;
 
 import hu.bme.mit.theta.core.decl.VarDecl;
 import hu.bme.mit.theta.core.model.ImmutableValuation;
+import hu.bme.mit.theta.core.stmt.Stmt;
 import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.LitExpr;
 import hu.bme.mit.theta.core.type.anytype.RefExpr;
@@ -14,6 +15,7 @@ import hu.bme.mit.theta.xcfa.model.XcfaLabel;
 import hu.bme.mit.theta.xcfa.model.XcfaProcedure;
 import hu.bme.mit.theta.xcfa.passes.procedurepass.ProcedurePass;
 import kotlin.Pair;
+import kotlin.Unit;
 import kotlin.ranges.IntRange;
 import kotlin.ranges.LongRange;
 
@@ -51,10 +53,12 @@ public class ProbabilisticMapper extends ProcedurePass {
 		final VarDecl<IntType> var = cast(varGeneric, Int());
 		final Expr<?> a = params.get(1);
 		final Expr<?> b = params.get(2);
-		final Expr<?> sum = Add(a, b);
-		return Stmt(new ProbStmt(new EnumeratedDistribution(List.of(
-				new Pair<>(Assign(var, Int(0)), Div(a, sum)),
-				new Pair<>(Assign(var, Int(1)), Div(b, sum))
+		final int evalA = ((IntLitExpr) cast(a.eval(ImmutableValuation.empty()), Int())).getValue().intValue();
+		final int evalB = ((IntLitExpr) cast(b.eval(ImmutableValuation.empty()), Int())).getValue().intValue();
+		final int sum = evalA+evalB;
+		return Stmt(new ProbStmt(new EnumeratedDistribution<>(List.of(
+				new Pair<>(Assign(var, Int(0)), (double) evalA/sum),
+				new Pair<>(Assign(var, Int(1)), (double) evalB/sum)
 		))));
 	}
 

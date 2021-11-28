@@ -8,6 +8,7 @@ import hu.bme.mit.theta.core.decl.VarDecl
 import hu.bme.mit.theta.core.model.Valuation
 import hu.bme.mit.theta.core.stmt.HavocStmt
 import hu.bme.mit.theta.core.stmt.NonDetStmt
+import hu.bme.mit.theta.core.stmt.SequenceStmt
 import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs.And
@@ -16,7 +17,8 @@ import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.ExprUtils
 import hu.bme.mit.theta.core.utils.PathUtils
 import hu.bme.mit.theta.core.utils.PrimeCounter
-import hu.bme.mit.theta.core.utils.VarIndexing
+import hu.bme.mit.theta.core.utils.indexings.VarIndexing
+import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 
@@ -32,6 +34,7 @@ class ExplGroupedTransferFunction(
             is HavocStmt<*> ->
                 // The simplified computation of havoc is always correct for explicit abstraction
                 listOf(getNonGroupedNextStates(state, stmt, prec))
+            is SequenceStmt -> TODO()
             else ->
                 getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
         }
@@ -62,7 +65,7 @@ class ExplGroupedTransferFunction(
         val result = arrayListOf<List<ExplState>>()
 
         WithPushPop(solver).use {
-            solver.add(PathUtils.unfold(fullExpr, VarIndexing.all(0)))
+            solver.add(PathUtils.unfold(fullExpr, VarIndexingFactory.indexing(0)))
             while (solver.check().isSat) {
                 val model = solver.model
                 val feedback = arrayListOf<Expr<BoolType>>()

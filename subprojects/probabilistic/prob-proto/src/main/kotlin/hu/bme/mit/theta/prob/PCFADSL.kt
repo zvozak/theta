@@ -77,7 +77,7 @@ operator fun SourceWithStatement.minus(trgt: Loc) {
 infix fun Expr<BoolType>.and(other: Expr<BoolType>): AndExpr = BoolExprs.And(this, other)
 infix fun Expr<BoolType>.or(other: Expr<BoolType>): OrExpr = BoolExprs.Or(this, other)
 
-fun prob(distr: EnumeratedDistribution<Stmt, Void>): ProbStmt = ProbStmt(distr)
+fun prob(distr: EnumeratedDistribution<Stmt, Unit>): ProbStmt = ProbStmt(distr)
 fun coin(v: VarDecl<BoolType>, e1: Double, e2: Double): ProbStmt =
     ProbStmt(EnumeratedDistribution(
         listOf( (v assign True()) to (e1/(e1+e2)), (v assign False()) to (e2/(e1+e2)) )

@@ -9,6 +9,7 @@ import hu.bme.mit.theta.cfa.CFA
 import hu.bme.mit.theta.cfa.analysis.*
 import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
+import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.prob.AbstractionGame.ChoiceNode
 import hu.bme.mit.theta.prob.AbstractionGame.StateNode
@@ -57,8 +58,8 @@ fun <S: ExprState> checkPCFA(
     var currPrec = initialPrec
 
     while (true) {
-        // TODO: get rid of separately returned init nodes
-        val (game, initNodes) = computeGameAbstraction(init, lts, transFunc, currPrec)
+        val game = computeGameAbstraction(init, lts, transFunc, currPrec)
+        val initNodes = game.initNodes.toList()
 
         // Computing the approximation for the property under check for the abstraction
 
@@ -109,12 +110,19 @@ fun <S: ExprState> checkPCFA(
                 minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues,
             )!!
             if (currPrec is GlobalCfaPrec<PredPrec>) {
-                currPrec = wprefineGameAbstraction(
+                currPrec = PredRefiner.wprefineGameAbstraction(
                     game, stateToRefine, currPrec,
                     minCheckResult.abstractionNodeValues, maxCheckResult.abstractionNodeValues,
                     minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues,
                 )
-            } else TODO("Local CFA Prec -> Predicate Propagation")
+            } else if(currPrec is LocalCfaPrec<PredPrec>) {
+                currPrec = PredRefiner.wprefineGameAbstraction(
+                    game, stateToRefine, currPrec,
+                    minCheckResult.abstractionNodeValues, maxCheckResult.abstractionNodeValues,
+                    minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues,
+                    shortestTracePropagator
+                )
+            }
         }
     }
 }
@@ -124,7 +132,7 @@ fun <P : Prec, S : ExprState> computeGameAbstraction(
     lts: CfaSbeLts,
     transFunc: CfaGroupedTransferFunction<S, P>,
     currPrec: CfaPrec<P>
-): Pair<AbstractionGame<CfaState<S>, CfaAction, Unit>, List<StateNode<CfaState<S>, CfaAction>>> {
+): AbstractionGame<CfaState<S>, CfaAction, Unit> {
     val sInit = init.getInitStates(currPrec).toSet()
 
     val game = AbstractionGame<CfaState<S>, CfaAction, Unit>()
@@ -170,23 +178,30 @@ fun <P : Prec, S : ExprState> computeGameAbstraction(
                     }
 
                     val nextStateDistr = EnumeratedDistribution(nextStatePMF, metadata)
-                    val choiceNode = game.createConcreteChoiceNode()
+
+//                    val choiceNode = game.createConcreteChoiceNode()
+//                    game.connect(choiceNode, nextStateDistr, Unit)
+                    val choiceNode = game.getOrCreateNodeWithChoices(setOf(nextStateDistr to Unit))
                     game.connect(node, choiceNode, action)
-                    game.connect(choiceNode, nextStateDistr, Unit)
 
                     // TODO: merge next state distributions if possible
                 }
             } else {
                 for (nextStateSet in nextStates) {
-                    val choiceNode = game.createConcreteChoiceNode()
+                    val choices = nextStateSet.map { nextState ->
+                        // TODO: get rid of that cast
+                        dirac(getOrCreateNode(nextState) as StateNode<CfaState<S>, *>, mutableListOf(stmt)) to Unit
+                    }.toSet()
+                    val choiceNode = game.getOrCreateNodeWithChoices(choices)
+//                    val choiceNode = game.createConcreteChoiceNode()
                     game.connect(node, choiceNode, action)
-                    for (nextState in nextStateSet) {
-                        game.connect(choiceNode, dirac(getOrCreateNode(nextState), arrayListOf(stmt)), Unit)
-                    }
+//                    for (nextState in nextStateSet) {
+//                        game.connect(choiceNode, dirac(getOrCreateNode(nextState), arrayListOf(stmt)), Unit)
+//                    }
                 }
             }
         }
     }
-    return Pair(game, initNodes)
+    return game
 }
 

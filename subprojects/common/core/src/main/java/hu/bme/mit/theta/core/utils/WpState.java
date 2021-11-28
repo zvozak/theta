@@ -34,7 +34,10 @@ import hu.bme.mit.theta.core.stmt.Stmt;
 import hu.bme.mit.theta.core.stmt.StmtVisitor;
 import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.Type;
+import hu.bme.mit.theta.core.type.booltype.BoolExprs;
 import hu.bme.mit.theta.core.type.booltype.BoolType;
+
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -162,12 +165,19 @@ public final class WpState {
 
 		@Override
 		public WpState visit(SequenceStmt stmt, WpState param) {
-			throw new UnsupportedOperationException();
+			WpState result = param;
+			for (Stmt subStmt : stmt.getStmts()) {
+				result = result.wp(subStmt);
+			}
+			return result;
 		}
 
 		@Override
 		public WpState visit(NonDetStmt stmt, WpState param) {
-			throw new UnsupportedOperationException();
+			var subExprs = stmt.getStmts().stream()
+					.map(stmt1 -> param.wp(stmt1).getExpr())
+					.collect(Collectors.toList());
+			return WpState.of(BoolExprs.Or(subExprs));
 		}
 
 		@Override
@@ -228,12 +238,19 @@ public final class WpState {
 
 		@Override
 		public WpState visit(SequenceStmt stmt, WpState param) {
-			throw new UnsupportedOperationException();
+			WpState result = param;
+			for (Stmt subStmt : stmt.getStmts()) {
+				result = result.wep(subStmt);
+			}
+			return result;
 		}
 
 		@Override
 		public WpState visit(NonDetStmt stmt, WpState param) {
-			throw new UnsupportedOperationException();
+			var subExprs = stmt.getStmts().stream()
+					.map(stmt1 -> param.wep(stmt1).getExpr())
+					.collect(Collectors.toList());
+			return WpState.of(BoolExprs.Or(subExprs));
 		}
 
 		@Override

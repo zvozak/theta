@@ -8,6 +8,7 @@ import hu.bme.mit.theta.core.decl.Decls
 import hu.bme.mit.theta.core.decl.VarDecl
 import hu.bme.mit.theta.core.stmt.HavocStmt
 import hu.bme.mit.theta.core.stmt.NonDetStmt
+import hu.bme.mit.theta.core.stmt.SequenceStmt
 import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.Type
@@ -48,7 +49,7 @@ class PredGroupedTransferFunction(
                 else
                     handleHavocGeneral(stmt, state, prec)
             }
-            else -> {
+            else -> { // Sequence statement is OK here, as long as it does not contain non-dets
                 getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
             }
         }

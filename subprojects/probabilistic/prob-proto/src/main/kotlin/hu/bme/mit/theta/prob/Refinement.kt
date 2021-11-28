@@ -4,29 +4,25 @@ import hu.bme.mit.theta.analysis.Prec
 import hu.bme.mit.theta.analysis.State
 import hu.bme.mit.theta.analysis.expl.ExplPrec
 import hu.bme.mit.theta.analysis.expl.ExplState
-import hu.bme.mit.theta.analysis.expr.ExprAction
 import hu.bme.mit.theta.analysis.expr.ExprState
 import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.analysis.pred.ExprSplitters
 import hu.bme.mit.theta.analysis.pred.PredPrec
 import hu.bme.mit.theta.analysis.pred.PredState
-import hu.bme.mit.theta.analysis.waitlist.Waitlist
-import hu.bme.mit.theta.cfa.analysis.CfaAction
 import hu.bme.mit.theta.cfa.analysis.CfaState
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
+import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.decl.VarDecl
 import hu.bme.mit.theta.core.stmt.NonDetStmt
 import hu.bme.mit.theta.core.stmt.Stmt
+import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
 import hu.bme.mit.theta.core.type.booltype.BoolType
-import hu.bme.mit.theta.core.utils.ExprUtils
 import hu.bme.mit.theta.core.utils.ExprUtils.collectVars
 import hu.bme.mit.theta.core.utils.WpState
 import hu.bme.mit.theta.prob.AbstractionGame.*
 import hu.bme.mit.theta.solver.ItpSolver
 import java.util.*
-import kotlin.collections.HashSet
-import kotlin.math.max
 
 typealias StateNodeValues<S, LAbs> = Map<StateNode<S, LAbs>, Double>
 typealias ChoiceNodeValues<S, LConc> = Map<ChoiceNode<S, LConc>, Double>
@@ -158,7 +154,7 @@ object PredRefiner {
         val maxEdge = stateToRefine.outgoingEdges.maxBy { VCmax[it.end]!! }!!
         val minEdge = stateToRefine.outgoingEdges.minBy { VCmin[it.end]!! }!!
 
-        // TODO: Allow LBE
+        // TODO: Allow action-based LBE?
         require(maxEdge.label.stmts.size == 1 && minEdge.label.stmts.size == 1)
         val maxStmt = maxEdge.label.stmts.first()
 
@@ -184,7 +180,139 @@ object PredRefiner {
         val newSubPrec = origPrecision.prec.join(PredPrec.of(wpPreds))
         return GlobalCfaPrec.create(newSubPrec)
     }
+
+    fun <S : CfaState<*>, LAbs : StmtAction, LConc> wprefineGameAbstraction(
+        game: AbstractionGame<S, LAbs, LConc>,
+        stateToRefine: StateNode<S, LAbs>,
+        origPrecision: LocalCfaPrec<PredPrec>,
+        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
+        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>,
+        predicatePropagator: PredicatePropagator
+    ): LocalCfaPrec<PredPrec> {
+        require(stateToRefine.outgoingEdges.isNotEmpty())
+
+        val maxEdge = stateToRefine.outgoingEdges.maxBy { VCmax[it.end]!! }!!
+        val minEdge = stateToRefine.outgoingEdges.minBy { VCmin[it.end]!! }!!
+
+        // TODO: Allow action-based LBE?
+        require(maxEdge.label.stmts.size == 1 && minEdge.label.stmts.size == 1)
+        val maxStmt = maxEdge.label.stmts.first()
+
+        val wpPreds = if (maxStmt is ProbStmt) {
+            // We assume that a probabilistic location cannot be non-deterministic at the same time
+            // This works for the PCFA formalism, but won't be true in general
+            require(maxEdge.end.outgoingEdges.size == 1)
+            val wps = maxEdge.end.outgoingEdges.first().end.metadata.flatMap { (resultingState, stmtList) ->
+                stmtList.map { stmt ->
+                    val wpstate = WpState.of(resultingState.state.toExpr())
+                    return@map wpstate.wep(stmt).expr
+                }
+            }
+            wps.flatMap(ExprSplitters.atoms()::apply).toSet()
+        } else if (maxStmt is NonDetStmt) {
+            TODO("Not supported yet")
+        } else {
+            val targetState = maxEdge.end.outgoingEdges.first().end.pmf.keys.first().state
+            val wps = WpState.of(targetState.toExpr())
+            ExprSplitters.atoms().apply(wps.wep(maxStmt).expr).toSet()
+        }
+
+        val newPrec = predicatePropagator.propagate(
+            game as AbstractionGame<CfaState<PredState>, LAbs, LConc>,
+            stateToRefine as StateNode<CfaState<PredState>, LAbs>,
+            origPrecision,
+            wpPreds.toList()
+        )
+
+        return newPrec
+    }
 }
+
+interface PredicatePropagator {
+    fun <LAbs: StmtAction, LConc> propagate(
+        game: AbstractionGame<CfaState<PredState>, LAbs, LConc>,
+        refinedState: StateNode<CfaState<PredState>, LAbs>,
+        origPrecision: LocalCfaPrec<PredPrec>,
+        newPredicates: List<Expr<BoolType>>
+    ): LocalCfaPrec<PredPrec>
+}
+
+object nonPropagatingPropagator: PredicatePropagator {
+    override fun <LAbs : StmtAction, LConc> propagate(
+        game: AbstractionGame<CfaState<PredState>, LAbs, LConc>,
+        refinedState: StateNode<CfaState<PredState>, LAbs>,
+        origPrecision: LocalCfaPrec<PredPrec>,
+        newPredicates: List<Expr<BoolType>>
+    ): LocalCfaPrec<PredPrec> {
+        val loc = refinedState.state.loc
+        val origLocalPrec = origPrecision.getPrec(loc)
+        val newLocalPrec = origLocalPrec.join(PredPrec.of(newPredicates))
+        return origPrecision.refine(loc, newLocalPrec)
+    }
+}
+
+object shortestTracePropagator: PredicatePropagator {
+    override fun <LAbs : StmtAction, LConc> propagate(
+        game: AbstractionGame<CfaState<PredState>, LAbs, LConc>,
+        refinedState: StateNode<CfaState<PredState>, LAbs>,
+        origPrecision: LocalCfaPrec<PredPrec>,
+        newPredicates: List<Expr<BoolType>>
+    ): LocalCfaPrec<PredPrec> {
+        // Use the first predecessor maps in the game to find a shortest play,
+        // and add the new predicates to each location
+        // TODO: this is a shortest play only if the game was created using BFS,
+        //       which is true for the BVI-based analysis (full state-space exploration),
+        //       but won't be for BRTDP (simulation-based partial state-space exploration)
+
+        var newPrec = origPrecision
+        fun refinePrec(
+            stateNode: StateNode<CfaState<PredState>, LAbs>,
+            newPreds: Collection<Expr<BoolType>>
+        ) {
+            val loc = stateNode.state.loc
+            val origLocalPrec = newPrec.getPrec(loc)
+            val newLocalPrec = origLocalPrec.join(PredPrec.of(newPreds))
+            newPrec = newPrec.refine(loc, newLocalPrec)
+        }
+        val addedPreds = newPredicates.filter {
+            // TODO: stop at first var
+            val l = arrayListOf<VarDecl<*>>();
+            collectVars(it, l)
+            l.size>0
+        }
+        refinePrec(refinedState, addedPreds)
+
+        var currStateNode = refinedState
+        var currPreds = newPredicates
+        while (currStateNode !in game.initNodes && currPreds.isNotEmpty()) {
+            val predecessorEdge = game.getFirstPredecessorEdge(currStateNode)!! // this will be a choice node
+
+            val preconditions = currPreds.map {
+                val stmts = predecessorEdge.end.metadata[currStateNode]
+                val wps = WpState.of(it)
+                BoolExprs.Or(stmts!!.map {wps.wep(it).expr})
+            }
+            currPreds = preconditions
+                .flatMap(ExprSplitters.atoms()::apply)
+                .toSet()
+                .filter {
+                    // TODO: stop at first var
+                    val l = arrayListOf<VarDecl<*>>();
+                    collectVars(it, l)
+                    l.size>0
+                }
+                .toList()
+            refinePrec(currStateNode, currPreds)
+
+            currStateNode = game.getFirstPredecessorEdge(predecessorEdge.start)?.start!!
+        }
+
+        return newPrec
+    }
+
+}
+
+
 
 class ItpGameAbstractionRefiner<S: ExprState, P: Prec, LAbs: Stmt, LConc>(
     val solver: ItpSolver

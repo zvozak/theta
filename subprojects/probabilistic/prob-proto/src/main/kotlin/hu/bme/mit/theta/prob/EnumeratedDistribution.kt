@@ -3,7 +3,7 @@ package hu.bme.mit.theta.prob
 import hu.bme.mit.theta.core.stmt.Stmt
 
 // TODO: better solution for storing the statements leading to the state instead of a metadata field
-class EnumeratedDistribution<D, M>(
+data class EnumeratedDistribution<D, M>(
     val pmf: Map<D, Double>,
     val metadata: Map<D, M> = mapOf()
     ) {
@@ -19,4 +19,5 @@ class EnumeratedDistribution<D, M>(
     override fun toString(): String {
         return "[${pmf.map { "${it.value}:${it.key}" }.joinToString(", ")}]"
     }
+
 }

@@ -6,6 +6,7 @@ import hu.bme.mit.theta.analysis.pred.PredPrec
 import hu.bme.mit.theta.cfa.analysis.CfaInitFunc
 import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
+import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
 import hu.bme.mit.theta.prob.*
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
@@ -66,7 +67,8 @@ class OTFMDPAbstractionTests {
         val initPrec = GlobalCfaPrec.create(PredPrec.of())
 
 //        val testPrec = GlobalCfaPrec.create(PredPrec.of(testPredList))
-        val testPrec = GlobalCfaPrec.create(PredPrec.of())
+//        val testPrec = GlobalCfaPrec.create(PredPrec.of())
+        val testPrec = LocalCfaPrec.create(PredPrec.of())
 
 //        val testInit = initFunc.getInitStates(testPrec)
 //
@@ -79,9 +81,9 @@ class OTFMDPAbstractionTests {
 //        val act = lts.getEnabledActionsFor(s).first()
 //        val nexts = transFunc.getSuccStates(s, act, testPrec)
 
-        val game = computeGameAbstraction(
-            initFunc, lts, transFunc, testPrec
-        ).first
+//        val game = computeGameAbstraction(
+//            initFunc, lts, transFunc, testPrec
+//        )
 
         val checkResult = checkPCFA(
             transFunc, lts, initFunc,
@@ -90,5 +92,6 @@ class OTFMDPAbstractionTests {
             0.1, PropertyType.LESS_THAN,
             nearestRefinableStateSelector
         )
+
     }
 }

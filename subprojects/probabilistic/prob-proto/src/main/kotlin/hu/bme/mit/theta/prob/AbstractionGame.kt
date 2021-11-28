@@ -16,6 +16,8 @@ class AbstractionGame<S: State, LAbs, LConc>(
     }
 
     val stateNodeMap = hashMapOf<S, StateNode<S, LAbs>>()
+    private val firstPredecessorForStateNode = hashMapOf<StateNode<S, LAbs>, ConcreteChoiceEdge<S, LConc>>()
+    private val firstPredecessorForChoiceNode = hashMapOf<ChoiceNode<S, LConc>, AbstractionChoiceEdge<S, LAbs>>()
 
     /**
      * @param S The type representing abstract states
@@ -68,14 +70,40 @@ class AbstractionGame<S: State, LAbs, LConc>(
 
     fun createConcreteChoiceNode(): ChoiceNode<S, LConc> = ChoiceNode<S, LConc>().also { concreteChoiceNodes.add(it) }
 
+    fun getOrCreateNodeWithChoices(
+        choices: Set<Pair<
+                    EnumeratedDistribution<StateNode<S, *>, MutableList<Stmt>>, LConc
+                >>
+    ): ChoiceNode<S, LConc> {
+        // TODO: make the search more efficient by pre-partitioning the list
+        return concreteChoiceNodes.firstOrNull {
+            it.outgoingEdges.size == choices.size &&
+            it.outgoingEdges.all { edge-> choices.contains(Pair(edge.end, edge.label)) }
+        } ?: createConcreteChoiceNode().also {
+            choices.forEach { (end, lbl) -> connect(it, end, lbl) }
+        }
+    }
+
     fun connect(s: StateNode<S, LAbs>, concreteChoiceNode: ChoiceNode<S, LConc>, label: LAbs) {
         require(s in stateNodes)
         val edge = AbstractionChoiceEdge(s, concreteChoiceNode, label)
         abstractionChoiceEdges.add(edge)
+        firstPredecessorForChoiceNode.putIfAbsent(concreteChoiceNode, edge)
     }
 
-    fun connect(concreteChoiceNode: ChoiceNode<S, LConc>, distribution: EnumeratedDistribution<StateNode<S, *>, MutableList<Stmt>>, label: LConc) {
+    fun connect(
+        concreteChoiceNode: ChoiceNode<S, LConc>,
+        distribution: EnumeratedDistribution<StateNode<S, *>, MutableList<Stmt>>,
+        label: LConc
+    ) {
         val edge = ConcreteChoiceEdge<S, LConc>(concreteChoiceNode, distribution, label)
         concreteChoiceEdges.add(edge)
+        for (stateNode in distribution.pmf.keys) {
+            // TODO: get rid of that cast
+            firstPredecessorForStateNode.putIfAbsent(stateNode as StateNode<S, LAbs>, edge)
+        }
     }
+
+    fun getFirstPredecessorEdge(stateNode: StateNode<S, LAbs>) = firstPredecessorForStateNode[stateNode]
+    fun getFirstPredecessorEdge(choiceNode: ChoiceNode<S, LConc>) = firstPredecessorForChoiceNode[choiceNode]
 }
