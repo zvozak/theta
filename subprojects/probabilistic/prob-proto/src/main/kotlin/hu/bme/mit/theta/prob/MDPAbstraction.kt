@@ -3,17 +3,15 @@ package hu.bme.mit.theta.prob
 import hu.bme.mit.theta.analysis.Prec
 import hu.bme.mit.theta.analysis.State
 import hu.bme.mit.theta.analysis.expr.ExprState
-import hu.bme.mit.theta.analysis.pred.PredPrec
 import hu.bme.mit.theta.analysis.waitlist.FifoWaitlist
 import hu.bme.mit.theta.cfa.CFA
 import hu.bme.mit.theta.cfa.analysis.*
 import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
-import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
-import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.prob.AbstractionGame.ChoiceNode
 import hu.bme.mit.theta.prob.AbstractionGame.StateNode
 import hu.bme.mit.theta.prob.EnumeratedDistribution.Companion.dirac
+import hu.bme.mit.theta.prob.TransferFunctions.CfaGroupedTransferFunction
 
 fun <S: State, LAbs, LConc> strategyFromValues(
     VA: Map<StateNode<S, LAbs>, Double>,
@@ -46,13 +44,14 @@ data class PCFACheckResult(
 )
 
 typealias PcfaStateNode<S> = StateNode<CfaState<S>, CfaAction>
-fun <S: ExprState> checkPCFA(
-    transFunc: CfaGroupedTransferFunction<S, PredPrec>,
+fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkPCFA(
+    transFunc: CfaGroupedTransferFunction<S, SubP>,
     lts: CfaSbeLts, // LBE not supported yet!
-    init: CfaInitFunc<S, PredPrec>,
-    initialPrec: CfaPrec<PredPrec>,
+    init: CfaInitFunc<S, SubP>,
+    initialPrec: P,
     errorLoc: CFA.Loc, finalLoc: CFA.Loc,
     nonDetGoal: OptimType, propertyThreshold: Double, propertyType: PropertyType,
+    precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>,
     refinableStateSelector: RefinableStateSelector
 ): PCFACheckResult {
     var currPrec = initialPrec
@@ -74,18 +73,18 @@ fun <S: ExprState> checkPCFA(
 
         val convergenceThreshold = 1e-6
 
-        val maxCheckResult = BVI(
+        val minCheckResult = BVI(
             game,
-            OptimType.MAX, nonDetGoal,
+            OptimType.MIN, nonDetGoal,
             convergenceThreshold,
             LAinit, LCinit,
             UAinit, UCinit,
             initNodes
         )
 
-        val minCheckResult = BVI(
+        val maxCheckResult = BVI(
             game,
-            OptimType.MIN, nonDetGoal,
+            OptimType.MAX, nonDetGoal,
             convergenceThreshold,
             LAinit, LCinit,
             UAinit, UCinit,
@@ -109,20 +108,11 @@ fun <S: ExprState> checkPCFA(
                 minCheckResult.abstractionNodeValues, maxCheckResult.abstractionNodeValues,
                 minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues,
             )!!
-            if (currPrec is GlobalCfaPrec<PredPrec>) {
-                currPrec = PredRefiner.wprefineGameAbstraction(
-                    game, stateToRefine, currPrec,
-                    minCheckResult.abstractionNodeValues, maxCheckResult.abstractionNodeValues,
-                    minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues,
-                )
-            } else if(currPrec is LocalCfaPrec<PredPrec>) {
-                currPrec = PredRefiner.wprefineGameAbstraction(
-                    game, stateToRefine, currPrec,
-                    minCheckResult.abstractionNodeValues, maxCheckResult.abstractionNodeValues,
-                    minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues,
-                    shortestTracePropagator
-                )
-            }
+            currPrec = precRefiner.refine(
+                game, stateToRefine, currPrec,
+                minCheckResult.abstractionNodeValues, maxCheckResult.abstractionNodeValues,
+                minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues
+            )
         }
     }
 }
@@ -159,7 +149,7 @@ fun <P : Prec, S : ExprState> computeGameAbstraction(
         val actions = lts.getEnabledActionsFor(s)
 
         for (action in actions) {
-            require(action.stmts.size == 1) // TODO: LBE not supported yet
+            require(action.stmts.size == 1) // TODO: action-based LBE not supported yet
             val stmt = action.stmts.first()
             val nextStates = transFunc.getSuccStates(s, action, currPrec)
             if (stmt is ProbStmt) {

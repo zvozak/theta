@@ -1,4 +1,4 @@
-package hu.bme.mit.theta.prob
+package hu.bme.mit.theta.prob.TransferFunctions
 
 import hu.bme.mit.theta.analysis.expl.ExplPrec
 import hu.bme.mit.theta.analysis.expl.ExplState
@@ -19,6 +19,7 @@ import hu.bme.mit.theta.core.utils.PathUtils
 import hu.bme.mit.theta.core.utils.PrimeCounter
 import hu.bme.mit.theta.core.utils.indexings.VarIndexing
 import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
+import hu.bme.mit.theta.prob.GroupedTransferFunction
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 
@@ -34,7 +35,9 @@ class ExplGroupedTransferFunction(
             is HavocStmt<*> ->
                 // The simplified computation of havoc is always correct for explicit abstraction
                 listOf(getNonGroupedNextStates(state, stmt, prec))
-            is SequenceStmt -> TODO()
+            is SequenceStmt ->
+                if (stmt.stmts.any {it is HavocStmt<*>}) TODO()
+                else getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
             else ->
                 getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
         }

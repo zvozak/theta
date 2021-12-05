@@ -6,6 +6,7 @@ import hu.bme.mit.theta.prob.AbstractionGame.StateNode
 import hu.bme.mit.theta.prob.ERGNode.WrappedChoiceNode
 import hu.bme.mit.theta.prob.ERGNode.WrappedStateNode
 import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 import kotlin.math.max
 import kotlin.math.min
@@ -72,7 +73,9 @@ fun <S : State, LAbs, LConc> BVI(
     var UA: HashMap<StateNode<S,LAbs>, Double> = HashMap(UAinit) // Upper approximation for Abstraction node values
     var UC: HashMap<ChoiceNode<S, LConc>, Double> = HashMap(UCinit) // Upper approximation for Concrete choice node values
 
+    var iters = 0
     do {
+        iters++
         // Bellman updates
         val LAnext = HashMap(LA)
         val LCnext = HashMap(LC)
@@ -88,7 +91,7 @@ fun <S : State, LAbs, LConc> BVI(
             val uEdgeValues = stateNode.outgoingEdges.map { edge ->
                 UC[edge.end]!!
             }
-            UAnext[stateNode] = playerAGoal.select(uEdgeValues) ?: LAnext[stateNode]
+            UAnext[stateNode] = playerAGoal.select(uEdgeValues) ?: UAnext[stateNode]
         }
 
         for (choiceNode in LC.keys) {
@@ -161,16 +164,18 @@ fun <S : State, LAbs, LConc> BVI(
             var bestExit = 0.0
             if(playerAGoal == OptimType.MAX) {
                 bestExit = msec.first.flatMap {
-                    it.outgoingEdges.map { UC[it.end]!! }
+                    it.outgoingEdges.filter { it.end !in msec.second }.map { UC[it.end]!! }
                 }.max() ?: 0.0
             }
             if(playerCGoal == OptimType.MAX) {
                 val bestAExit =msec.second.flatMap {
-                    it.outgoingEdges.map {
-                        it.end.pmf.entries.sumByDouble { (stateNode, prob) ->
-                            prob * (LA[stateNode]!!)
+                    it.outgoingEdges
+                        .filter { it.end.pmf.keys.any { it !in msec.first } }
+                        .map {
+                            it.end.pmf.entries.sumByDouble { (stateNode, prob) ->
+                                prob * (UA[stateNode]!!)
+                            }
                         }
-                    }
                 }.max() ?: 0.0
                 if(bestAExit > bestExit) bestExit = bestAExit
             }
@@ -188,7 +193,7 @@ fun <S : State, LAbs, LConc> BVI(
         val largestStateError = game.stateNodes.map { UA[it]!!-LA[it]!! }.max() ?: 0.0
         val largestChoiceError = game.concreteChoiceNodes.map { UC[it]!!-LC[it]!! }.max() ?: 0.0
         val largestError = max(largestStateError, largestChoiceError)
-    } while(errorOnCheckedNodes > threshold)
+    } while(largestError > threshold)
 //    } while(largestError > threshold)
 
     return AbstractionGameCheckResult(avgMap(LA, UA), avgMap(LC, UC))
@@ -209,7 +214,7 @@ private fun <S: State, LAbs, LConc> computeMECs(
     choiceNodeIndices: Map<ChoiceNode<S, LConc>, Int>
 ): List<MECType<S, LAbs, LConc>>
 {
-    var sccs: Set<Set<Int>>
+    var sccs: List<Set<Int>>
     do {
         var modified = false
         sccs = computeSCCs(ERG)
@@ -223,7 +228,7 @@ private fun <S: State, LAbs, LConc> computeMECs(
                     }
                     is WrappedChoiceNode<S, LAbs, LConc> -> {
                          val newNeighbors = node.choiceNode.outgoingEdges
-                            .asSequence()
+//                            .asSequence()
                             .map { it.end.pmf.keys.map { stateNodeIndices[it]!! } }
                             .filter { it.all(scc::contains) }
                             .flatten().toSet().toMutableList()
@@ -251,17 +256,20 @@ private fun <S: State, LAbs, LConc> computeMECs(
 }
 
 private fun <S:State, LA, LC> computeSCCs(ERG: EdgeRelationGraph<S, LA, LC>
-): Set<Set<Int>>
+): List<Set<Int>>
 {
     // The computation uses the Kosaraju algorithm
     // Everything can be treated through its index in ERG.nodes as an Int
 
     val L = Stack<Int>()
+    L.ensureCapacity(ERG.nodes.size)
 
     //DFS to push every vertex onto L in their DFS *completion* order
     val E = ERG.edgeList
 
     val dfsstack = Stack<Int>()
+    dfsstack.ensureCapacity(ERG.nodes.size)
+
     val visited = Array(E.size) {false}
     for(i in E.indices) {
         if(visited[i]) continue
@@ -292,7 +300,7 @@ private fun <S:State, LA, LC> computeSCCs(ERG: EdgeRelationGraph<S, LA, LC>
 
     val q: Queue<Int> = ArrayDeque<Int>()
     val assigned = Array(E.size) {false}
-    val SCCs: HashSet<Set<Int>> = HashSet<Set<Int>>()
+    val SCCs: ArrayList<Set<Int>> = arrayListOf()
     while (!L.empty()) {
         val u=L.pop()
         if(assigned[u]) continue

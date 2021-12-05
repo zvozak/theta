@@ -1,10 +1,11 @@
-package hu.bme.mit.theta.prob
+package hu.bme.mit.theta.prob.TransferFunctions
 
 import hu.bme.mit.theta.analysis.Prec
 import hu.bme.mit.theta.analysis.expr.ExprState
 import hu.bme.mit.theta.cfa.analysis.CfaAction
 import hu.bme.mit.theta.cfa.analysis.CfaPrec
 import hu.bme.mit.theta.cfa.analysis.CfaState
+import hu.bme.mit.theta.prob.GroupedTransferFunction
 
 class CfaGroupedTransferFunction<S: ExprState, P: Prec>(
     val subTransFunc: GroupedTransferFunction<S, in CfaAction, P>

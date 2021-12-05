@@ -40,6 +40,7 @@ import hu.bme.mit.theta.xcfa.model.XcfaLabel;
 import hu.bme.mit.theta.xcfa.model.XcfaLabelVisitor;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -116,10 +117,12 @@ public class XcfaLabelVarReplacer implements XcfaLabelVisitor<Map<VarDecl<?>, Va
     public XcfaLabel visit(NonDetStmt stmt, Map<VarDecl<?>, VarDecl<?>> param) {
         List<Stmt> stmts = stmt.getStmts();
         List<Stmt> newStmts = new ArrayList<>();
-        for (Stmt stmt1 : stmts) {
-            newStmts.add(stmt1.accept(this, param).getStmt());
+        Map<Stmt, Stmt> stmtMapper = new HashMap<>();
+        for (Stmt subStmt : stmts) {
+            Stmt newStmt = subStmt.accept(this, param).getStmt();
+            stmtMapper.put(subStmt, newStmt);
         }
-        return Stmt(NonDetStmt(newStmts));
+        return Stmt(stmt.replaceStmts(stmtMapper));
     }
 
     @Override

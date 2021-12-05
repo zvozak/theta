@@ -9,4 +9,11 @@ class ProbStmt(
     override fun toString(): String {
         return "prob-" + super.toString() //TODO
     }
+
+    override fun replaceStmts(mapping: MutableMap<Stmt, Stmt>): NonDetStmt {
+        return ProbStmt(EnumeratedDistribution(
+                distr.pmf.map { (key, v) -> (mapping[key] ?: key) to v }.toMap(),
+                distr.metadata.map { (key, v) -> (mapping[key] ?: key) to v }.toMap()
+            ))
+    }
 }

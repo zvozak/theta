@@ -4,7 +4,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import hu.bme.mit.theta.common.Utils;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class NonDetStmt implements Stmt {
 
@@ -18,6 +20,14 @@ public class NonDetStmt implements Stmt {
 	protected NonDetStmt(final List<Stmt> stmts) {
 		if (stmts.isEmpty()) this.stmts= ImmutableList.of(SkipStmt.getInstance());
 		else this.stmts = stmts;
+	}
+
+	public NonDetStmt replaceStmts(Map<Stmt, Stmt> mapping) {
+		var newStmts = new ArrayList<Stmt>();
+		for (Stmt stmt : stmts) {
+			newStmts.add(mapping.getOrDefault(stmt, stmt));
+		}
+		return NonDetStmt.of(newStmts);
 	}
 
 	public static NonDetStmt of(final List<Stmt> stmts) {

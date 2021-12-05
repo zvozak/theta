@@ -9,6 +9,7 @@ import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.analysis.pred.ExprSplitters
 import hu.bme.mit.theta.analysis.pred.PredPrec
 import hu.bme.mit.theta.analysis.pred.PredState
+import hu.bme.mit.theta.cfa.analysis.CfaAction
 import hu.bme.mit.theta.cfa.analysis.CfaState
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
@@ -85,23 +86,23 @@ object nearestRefinableStateSelector: RefinableStateSelector {
     }
 }
 
-interface GameAbstractionRefiner<S: State, P: Prec, LAbs, LConc> {
+interface PrecRefiner<P: Prec, S: State, LAbs, LConc> {
     fun refine(
         game: AbstractionGame<S, LAbs, LConc>,
-        stateToRefine: StateNode<S,LAbs>,
-        origPrecision: GlobalCfaPrec<PredPrec>,
+        stateToRefine: StateNode<S, LAbs>,
+        origPrecision: P,
         VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
         VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
     ): P
 }
 
-
-object ExplRefiner {
-    fun <LAbs : StmtAction, LConc> wprefineGameAbstraction(
-        game: AbstractionGame<CfaState<ExplState>, LAbs, LConc>,
-        stateToRefine: StateNode<CfaState<ExplState>, LAbs>,
+class GlobalCfaExplRefiner<LConc>: PrecRefiner<
+        GlobalCfaPrec<ExplPrec>, CfaState<ExplState>, CfaAction, LConc> {
+    override fun refine(
+        game: AbstractionGame<CfaState<ExplState>, CfaAction, LConc>,
+        stateToRefine: StateNode<CfaState<ExplState>, CfaAction>,
         origPrecision: GlobalCfaPrec<ExplPrec>,
-        VAmin: StateNodeValues<CfaState<ExplState>, LAbs>, VAmax: StateNodeValues<CfaState<ExplState>, LAbs>,
+        VAmin: StateNodeValues<CfaState<ExplState>, CfaAction>, VAmax: StateNodeValues<CfaState<ExplState>, CfaAction>,
         VCmin: ChoiceNodeValues<CfaState<ExplState>, LConc>, VCmax: ChoiceNodeValues<CfaState<ExplState>, LConc>
     ): GlobalCfaPrec<ExplPrec> {
 
@@ -110,7 +111,6 @@ object ExplRefiner {
         val maxEdge = stateToRefine.outgoingEdges.maxBy { VCmax[it.end]!! }!!
         val minEdge = stateToRefine.outgoingEdges.minBy { VCmin[it.end]!! }!!
 
-        // TODO: Allow LBE
         require(maxEdge.label.stmts.size == 1 && minEdge.label.stmts.size == 1)
         val maxStmt = maxEdge.label.stmts.first()
 
@@ -140,12 +140,14 @@ object ExplRefiner {
     }
 }
 
-object PredRefiner {
-    fun <S : ExprState, LAbs : StmtAction, LConc> wprefineGameAbstraction(
-        game: AbstractionGame<S, LAbs, LConc>,
-        stateToRefine: StateNode<S, LAbs>,
+class GlobalCfaPredRefiner<S: ExprState, LConc>: PrecRefiner<
+        GlobalCfaPrec<PredPrec>, S, CfaAction, LConc> {
+
+    override fun refine(
+        game: AbstractionGame<S, CfaAction, LConc>,
+        stateToRefine: StateNode<S, CfaAction>,
         origPrecision: GlobalCfaPrec<PredPrec>,
-        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
+        VAmin: StateNodeValues<S, CfaAction>, VAmax: StateNodeValues<S, CfaAction>,
         VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
     ): GlobalCfaPrec<PredPrec> {
 
@@ -180,14 +182,17 @@ object PredRefiner {
         val newSubPrec = origPrecision.prec.join(PredPrec.of(wpPreds))
         return GlobalCfaPrec.create(newSubPrec)
     }
+}
 
-    fun <S : CfaState<*>, LAbs : StmtAction, LConc> wprefineGameAbstraction(
-        game: AbstractionGame<S, LAbs, LConc>,
-        stateToRefine: StateNode<S, LAbs>,
+class LocalCfaPredRefiner<S: ExprState, LConc>(
+    val predicatePropagator: PredicatePropagator
+): PrecRefiner<LocalCfaPrec<PredPrec>, S, CfaAction, LConc> {
+    override fun refine(
+        game: AbstractionGame<S, CfaAction, LConc>,
+        stateToRefine: StateNode<S, CfaAction>,
         origPrecision: LocalCfaPrec<PredPrec>,
-        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
+        VAmin: StateNodeValues<S, CfaAction>, VAmax: StateNodeValues<S, CfaAction>,
         VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>,
-        predicatePropagator: PredicatePropagator
     ): LocalCfaPrec<PredPrec> {
         require(stateToRefine.outgoingEdges.isNotEmpty())
 
@@ -218,8 +223,8 @@ object PredRefiner {
         }
 
         val newPrec = predicatePropagator.propagate(
-            game as AbstractionGame<CfaState<PredState>, LAbs, LConc>,
-            stateToRefine as StateNode<CfaState<PredState>, LAbs>,
+            game as AbstractionGame<CfaState<PredState>, CfaAction, LConc>,
+            stateToRefine as StateNode<CfaState<PredState>, CfaAction>,
             origPrecision,
             wpPreds.toList()
         )
@@ -311,34 +316,3 @@ object shortestTracePropagator: PredicatePropagator {
     }
 
 }
-
-
-
-class ItpGameAbstractionRefiner<S: ExprState, P: Prec, LAbs: Stmt, LConc>(
-    val solver: ItpSolver
-):
-        GameAbstractionRefiner<S, P, LAbs, LConc> {
-    override fun refine(
-        game: AbstractionGame<S, LAbs, LConc>,
-        stateToRefine: StateNode<S,LAbs>,
-        origPrecision: GlobalCfaPrec<PredPrec>,
-        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
-        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
-    ): P {
-        require(stateToRefine.outgoingEdges.isNotEmpty())
-
-        val maxEdge = stateToRefine.outgoingEdges.maxBy { VCmax[it.end]!! }!!
-        val minEdge = stateToRefine.outgoingEdges.minBy { VCmin[it.end]!! }!!
-
-        if(maxEdge.label is ProbStmt) {
-
-        }
-
-        TODO("Not yet implemented")
-    }
-}
-
-interface PrecRefiner<P: Prec> {
-
-}
-

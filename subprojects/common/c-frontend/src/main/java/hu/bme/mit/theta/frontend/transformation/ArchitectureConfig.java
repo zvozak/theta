@@ -66,15 +66,20 @@ public class ArchitectureConfig {
 	public enum ArithmeticType {
 		integer,
 		bitvector,
-		efficient
+		efficient,
+		unbounded
 	}
 
 	public static CComplexType.CComplexTypeVisitor<Expr<?>, Expr<?>> getCastVisitor() {
 		if(arithmetic == ArithmeticType.bitvector) return CastVisitor.instance;
+		else if(arithmetic == ArithmeticType.unbounded)
+			return hu.bme.mit.theta.frontend.transformation.model.types.complex.visitors.unbounded.CastVisitor.instance;
 		else return hu.bme.mit.theta.frontend.transformation.model.types.complex.visitors.integer.CastVisitor.instance;
 	}
 	public static CComplexType.CComplexTypeVisitor<Expr<?>, AssumeStmt> getLimitVisitor() {
 		if(arithmetic == ArithmeticType.bitvector) return LimitVisitor.instance;
+		else if(arithmetic == ArithmeticType.unbounded)
+			return hu.bme.mit.theta.frontend.transformation.model.types.complex.visitors.unbounded.LimitVisitor.instance;
 		else return hu.bme.mit.theta.frontend.transformation.model.types.complex.visitors.integer.LimitVisitor.instance;
 	}
 	public static CComplexType.CComplexTypeVisitor<Void, LitExpr<?>>  getNullValueVisitor() {

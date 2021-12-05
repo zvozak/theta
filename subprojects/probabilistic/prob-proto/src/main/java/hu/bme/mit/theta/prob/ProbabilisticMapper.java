@@ -6,8 +6,13 @@ import hu.bme.mit.theta.core.stmt.Stmt;
 import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.LitExpr;
 import hu.bme.mit.theta.core.type.anytype.RefExpr;
+import hu.bme.mit.theta.core.type.fptype.FpExprs;
+import hu.bme.mit.theta.core.type.fptype.FpLitExpr;
+import hu.bme.mit.theta.core.type.fptype.FpRoundingMode;
 import hu.bme.mit.theta.core.type.inttype.IntLitExpr;
 import hu.bme.mit.theta.core.type.inttype.IntType;
+import hu.bme.mit.theta.core.type.rattype.RatExprs;
+import hu.bme.mit.theta.core.utils.FpUtils;
 import hu.bme.mit.theta.frontend.FrontendMetadata;
 import hu.bme.mit.theta.frontend.transformation.model.types.complex.CComplexType;
 import hu.bme.mit.theta.xcfa.model.XcfaEdge;
@@ -44,6 +49,8 @@ public class ProbabilisticMapper extends ProcedurePass {
 	static {
 		addHandler(new String[]{"coin"}, ProbabilisticMapper::handleCoin);
 		addHandler(new String[]{"uniform"}, ProbabilisticMapper::handleUniform);
+		addHandler(new String[]{"prob_bool_bias"}, ProbabilisticMapper::handleProbBoolBias);
+		addHandler(new String[]{"prob_bool"}, ProbabilisticMapper::handleProbBool);
 	}
 
 	private static XcfaLabel handleCoin(XcfaProcedure.Builder builder, XcfaLabel.ProcedureCallXcfaLabel label) {
@@ -59,6 +66,35 @@ public class ProbabilisticMapper extends ProcedurePass {
 		return Stmt(new ProbStmt(new EnumeratedDistribution<>(List.of(
 				new Pair<>(Assign(var, Int(0)), (double) evalA/sum),
 				new Pair<>(Assign(var, Int(1)), (double) evalB/sum)
+		))));
+	}
+
+	private static XcfaLabel handleProbBoolBias(XcfaProcedure.Builder builder, XcfaLabel.ProcedureCallXcfaLabel label) {
+		final List<Expr<?>> params = label.getParams();
+		checkState(params.get(0) instanceof RefExpr, "Return param must be a reference!");
+		final VarDecl<?> varGeneric = (VarDecl<?>) ((RefExpr<?>) params.get(0)).getDecl();
+		final VarDecl<IntType> var = cast(varGeneric, Int());
+		final Expr<?> bias = params.get(1);
+		// TODO: parse this as double
+		final double evalBias =
+				FpUtils.fpLitExprToBigFloat(
+						FpRoundingMode.getDefaultRoundingMode(),
+						(FpLitExpr) bias.eval(ImmutableValuation.empty())
+				).doubleValue();
+		return Stmt(new ProbStmt(new EnumeratedDistribution<>(List.of(
+				new Pair<>(Assign(var, Int(0)), 1.0-evalBias),
+				new Pair<>(Assign(var, Int(1)), evalBias)
+		))));
+	}
+
+	private static XcfaLabel handleProbBool(XcfaProcedure.Builder builder, XcfaLabel.ProcedureCallXcfaLabel label) {
+		final List<Expr<?>> params = label.getParams();
+		checkState(params.get(0) instanceof RefExpr, "Return param must be a reference!");
+		final VarDecl<?> varGeneric = (VarDecl<?>) ((RefExpr<?>) params.get(0)).getDecl();
+		final VarDecl<IntType> var = cast(varGeneric, Int());
+		return Stmt(new ProbStmt(new EnumeratedDistribution<>(List.of(
+				new Pair<>(Assign(var, Int(0)), 0.5),
+				new Pair<>(Assign(var, Int(1)), 0.5)
 		))));
 	}
 

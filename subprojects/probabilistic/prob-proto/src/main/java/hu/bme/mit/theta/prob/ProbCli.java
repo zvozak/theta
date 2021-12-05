@@ -22,6 +22,7 @@ import com.google.common.base.Stopwatch;
 import hu.bme.mit.theta.c.frontend.dsl.gen.CLexer;
 import hu.bme.mit.theta.c.frontend.dsl.gen.CParser;
 import hu.bme.mit.theta.cfa.CFA;
+import hu.bme.mit.theta.cfa.analysis.config.CfaConfigBuilder;
 import hu.bme.mit.theta.cfa.analysis.utils.CfaVisualizer;
 import hu.bme.mit.theta.common.CliUtils;
 import hu.bme.mit.theta.common.logging.ConsoleLogger;
@@ -34,11 +35,7 @@ import hu.bme.mit.theta.frontend.transformation.model.statements.CStatement;
 import hu.bme.mit.theta.xcfa.model.XCFA;
 import hu.bme.mit.theta.xcfa.model.utils.FrontendXcfaBuilder;
 import hu.bme.mit.theta.xcfa.passes.XcfaPassManager;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.CallsToFinalLocs;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.CallsToHavocs;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.EmptyEdgeRemovalPass;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.RemoveDeadEnds;
-import hu.bme.mit.theta.xcfa.passes.procedurepass.SimplifyExprs;
+import hu.bme.mit.theta.xcfa.passes.procedurepass.*;
 import hu.bme.mit.theta.xcfa.passes.processpass.AnalyzeCallGraph;
 import hu.bme.mit.theta.xcfa.passes.processpass.FunctionInlining;
 import hu.bme.mit.theta.xcfa.passes.xcfapass.RemoveUnusedGlobals;
@@ -79,6 +76,30 @@ public class ProbCli {
 
 	@Parameter(names = "--loglevel", description = "Detailedness of logging")
 	Logger.Level logLevel = Logger.Level.MAINSTEP;
+
+	@Parameter(names = "--domain", description = "Abstract domain")
+	CfaConfigBuilder.Domain domain = CfaConfigBuilder.Domain.PRED_BOOL;
+
+	@Parameter(names = "--refinable-selection", description = "Algorithm for choosing a refinable state")
+	RefinableSelection refinableSelection = RefinableSelection.NEAREST;
+
+	@Parameter(names = "--precision-locality", description = "Separate precision for each location, or one global precision. Works only with predicate abstraction.")
+	PrecisionLocality precisionLocality = PrecisionLocality.GLOBAL;
+
+	@Parameter(names = "--predicate-propagation", description = "Method for propagating predicates to other locations if local precision is used.")
+	PredicatePropagation predicatePropagation = PredicatePropagation.NONE;
+
+	@Parameter(names = "--property-threshold", description = "")
+	double propertyThreshold = 0.01;
+
+	@Parameter(names = "--property-type", description = "")
+	PropertyType propertyType = PropertyType.LESS_THAN;
+
+	@Parameter(names = "--optim-type", description = "")
+	OptimType optimType = OptimType.MAX;
+
+	@Parameter(names = "--lbe", description = "Whether to use large-block encoding")
+	boolean lbe = false;
 
 	//////////// CONFIGURATION OPTIONS END ////////////
 
@@ -182,17 +203,30 @@ public class ProbCli {
 				List.of("reach_error")));									// map abort, exit and reach_error to final and error locations
 		XcfaPassManager.addProcedurePass(new ProbabilisticMapper());		// map probabilistic functions to ProbStmts
 
-		XcfaPassManager.addProcedurePass(new CallsToHavocs());				// If traditional havocs (__VERIFIER_nondet_<type>()) are needed, uncomment [maps functions]
-//		XcfaPassManager.addProcedurePass(new AddHavocRange());				// If traditional havocs (__VERIFIER_nondet_<type>()) are needed, uncomment [adds range constraint]
+//		XcfaPassManager.addProcedurePass(new CallsToHavocs());				// If traditional havocs (__VERIFIER_nondet_<type>()) are needed, uncomment [maps functions]
+		XcfaPassManager.addProcedurePass(new AddHavocRange());				// If traditional havocs (__VERIFIER_nondet_<type>()) are needed, uncomment [adds range constraint]
 
 		XcfaPassManager.addProcedurePass(new SimplifyExprs());				// Simplifies expressions
 //		XcfaPassManager.addProcedurePass(new UnusedVarRemovalPass());		// Variables with no usages are removed
 //		XcfaPassManager.addProcedurePass(new NoReadVarRemovalPass());		// Variables without a consumer are removed
 		XcfaPassManager.addProcedurePass(new RemoveUnreachable());			// Remove paths that are unreachable
 		XcfaPassManager.addProcedurePass(new EmptyEdgeRemovalPass());		// Removes empty edges by merging them
+
+		XcfaPassManager.addProcedurePass(new SimplifyAssumptions());
 	}
 
 	private void handleCfa(final CFA cfa) {
+		var config = new PCFAConfig(
+				domain,
+				refinableSelection,
+				precisionLocality,
+				predicatePropagation,
+				propertyType,
+				propertyThreshold,
+				optimType,
+				lbe
+		);
+		ProbCheckerCLIKt.handlePCFA(cfa, config);
 	}
 
 }

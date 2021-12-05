@@ -1,4 +1,4 @@
-package hu.bme.mit.theta.prob
+package hu.bme.mit.theta.prob.TransferFunctions
 
 import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.analysis.pred.PredPrec
@@ -22,6 +22,7 @@ import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.*
 import hu.bme.mit.theta.core.utils.indexings.VarIndexing
 import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
+import hu.bme.mit.theta.prob.GroupedTransferFunction
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 
@@ -49,7 +50,10 @@ class PredGroupedTransferFunction(
                 else
                     handleHavocGeneral(stmt, state, prec)
             }
-            else -> { // Sequence statement is OK here, as long as it does not contain non-dets
+            is SequenceStmt ->
+                if (stmt.stmts.any {it is HavocStmt<*>}) TODO()
+                else getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
+            else -> {
                 getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
             }
         }
