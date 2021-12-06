@@ -19,7 +19,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import hu.bme.mit.theta.cfa.CFA;
 import hu.bme.mit.theta.core.decl.VarDecl;
+import hu.bme.mit.theta.core.stmt.SequenceStmt;
 import hu.bme.mit.theta.core.stmt.SkipStmt;
+import hu.bme.mit.theta.core.stmt.Stmt;
 import hu.bme.mit.theta.core.type.LitExpr;
 import hu.bme.mit.theta.core.type.Type;
 import hu.bme.mit.theta.frontend.FrontendMetadata;
@@ -82,6 +84,7 @@ public final class XCFA {
 		}
 
 		for (XcfaLocation loc : getMainProcess().getMainProcedure().getLocs()) {
+			if (loc.getOutgoingEdges().size() == 0 && loc.getIncomingEdges().size() == 0) continue;
 			CFA.Loc cfaLoc = builder.createLoc(loc.getName() + "_id" + counter++);
 			FrontendMetadata.create(loc, "cfaLoc", cfaLoc);
 			locationLUT.put(loc, cfaLoc);
@@ -89,26 +92,25 @@ public final class XCFA {
 
 		for (XcfaEdge e : getMainProcess().getMainProcedure().getEdges()) {
 
-			List<CFA.Loc> locations = new ArrayList<>();
-			// Adding source
-			locations.add(locationLUT.get(e.getSource()));
-			// Adding intermediate locations (CFAs can only have one per edge)
-			for (int i = 1; i < e.getLabels().size(); ++i) {
-				CFA.Loc loc = builder.createLoc("tmp" + tmpcnt++);
-				locations.add(loc);
-				FrontendMetadata.create(e, "xcfaInterLoc", loc);
+			Stmt stmt;
+			if(e.getLabels().size() == 0) {
+				stmt = SkipStmt.getInstance();
+			} else if (e.getLabels().size() == 1) {
+				stmt = e.getLabels().get(0).accept(new XcfaLabelVarReplacer(), varLut).getStmt();
+			} else {
+				var subStmts = new ArrayList<Stmt>();
+				for (XcfaLabel label : e.getLabels()) {
+					subStmts.add(label.accept(new XcfaLabelVarReplacer(), varLut).getStmt());
+				}
+				stmt = SequenceStmt.of(subStmts);
 			}
-			// Adding target
-			locations.add(locationLUT.get(e.getTarget()));
-			// Adding edges
-			for (int i = 0; i < e.getLabels().size(); ++i) {
-				CFA.Edge edge = builder.createEdge(locations.get(i), locations.get(i + 1), e.getLabels().get(i).accept(new XcfaLabelVarReplacer(), varLut).getStmt());
-				FrontendMetadata.create(e, "cfaEdge", edge);
-			}
-			if (e.getLabels().size() == 0) {
-				CFA.Edge edge = builder.createEdge(locations.get(0), locations.get(1), SkipStmt.getInstance());
-				FrontendMetadata.create(e, "cfaEdge", edge);
-			}
+
+			CFA.Edge edge = builder.createEdge(
+					locationLUT.get(e.getSource()),
+					locationLUT.get(e.getTarget()),
+					stmt
+			);
+			FrontendMetadata.create(e, "cfaEdge", edge);
 		}
 
 		// Setting special locations (initial and final locations are mandatory, error location is not)

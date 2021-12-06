@@ -26,7 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public class EliminateSelfLoops extends ProcedurePass {
-	static final EliminateSelfLoops instance = new EliminateSelfLoops();
+	public static final EliminateSelfLoops instance = new EliminateSelfLoops();
 	@Override
 	public XcfaProcedure.Builder run(XcfaProcedure.Builder builder) {
 		Set<XcfaEdge> selfLoops = builder.getEdges().stream().filter(xcfaEdge -> xcfaEdge.getSource() == xcfaEdge.getTarget()).collect(Collectors.toSet());

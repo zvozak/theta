@@ -55,8 +55,10 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkPCFA(
     refinableStateSelector: RefinableStateSelector
 ): PCFACheckResult {
     var currPrec = initialPrec
+    var iters = 0
 
     while (true) {
+        iters++
         val game = computeGameAbstraction(init, lts, transFunc, currPrec)
         val initNodes = game.initNodes.toList()
 
@@ -79,7 +81,8 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkPCFA(
             convergenceThreshold,
             LAinit, LCinit,
             UAinit, UCinit,
-            initNodes
+            initNodes,
+            collapseMecs = false
         )
 
         val maxCheckResult = BVI(
@@ -88,7 +91,8 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkPCFA(
             convergenceThreshold,
             LAinit, LCinit,
             UAinit, UCinit,
-            initNodes
+            initNodes,
+            collapseMecs = false
         )
 
         val max = nonDetGoal.select(initNodes.map { maxCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
@@ -96,6 +100,10 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkPCFA(
 
         val maxSatisfies = propertyType.check(propertyThreshold, max)
         val minSatisfies = propertyType.check(propertyThreshold, min)
+
+        println("Iter $iters: ")
+        println("    $currPrec")
+        println("    [$min, $max]")
 
         if (maxSatisfies && minSatisfies) {
             return PCFACheckResult(true, min, max)

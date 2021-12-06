@@ -16,7 +16,9 @@
 
 package hu.bme.mit.theta.xcfa.passes.procedurepass;
 
+import hu.bme.mit.theta.core.stmt.SkipStmt;
 import hu.bme.mit.theta.xcfa.model.XcfaEdge;
+import hu.bme.mit.theta.xcfa.model.XcfaLabel;
 import hu.bme.mit.theta.xcfa.model.XcfaLocation;
 import hu.bme.mit.theta.xcfa.model.XcfaProcedure;
 
@@ -30,7 +32,15 @@ public class EmptyEdgeRemovalPass extends ProcedurePass {
 	@Override
 	public XcfaProcedure.Builder run(XcfaProcedure.Builder builder) {
 		// removing empty loops (empty edge that has the same source and target) - they are completely unnecessary
-		List<XcfaEdge> emptyLoops = builder.getEdges().stream().filter(xcfaEdge -> xcfaEdge.getLabels().size() == 0 && xcfaEdge.getTarget() == xcfaEdge.getSource()).collect(Collectors.toList());
+		List<XcfaEdge> emptyLoops = builder.getEdges().stream().filter(xcfaEdge ->
+		{
+			boolean noLabel = xcfaEdge.getLabels().size() == 0;
+			boolean isSkip = xcfaEdge.getLabels().size() == 1
+					&& xcfaEdge.getLabels().get(0) instanceof XcfaLabel.StmtXcfaLabel
+					&& xcfaEdge.getLabels().get(0).getStmt() instanceof SkipStmt;
+			return (noLabel || isSkip)
+					&& xcfaEdge.getTarget() == xcfaEdge.getSource();
+		}).collect(Collectors.toList());
 		for (XcfaEdge loop : emptyLoops) {
 			builder.removeEdge(loop);
 		}

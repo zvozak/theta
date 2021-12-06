@@ -28,11 +28,14 @@ import hu.bme.mit.theta.common.CliUtils;
 import hu.bme.mit.theta.common.logging.ConsoleLogger;
 import hu.bme.mit.theta.common.logging.Logger;
 import hu.bme.mit.theta.common.visualization.writer.GraphvizWriter;
+import hu.bme.mit.theta.core.stmt.HavocStmt;
+import hu.bme.mit.theta.core.stmt.NonDetStmt;
 import hu.bme.mit.theta.frontend.transformation.ArchitectureConfig;
 import hu.bme.mit.theta.frontend.transformation.grammar.function.FunctionVisitor;
 import hu.bme.mit.theta.frontend.transformation.model.statements.CProgram;
 import hu.bme.mit.theta.frontend.transformation.model.statements.CStatement;
 import hu.bme.mit.theta.xcfa.model.XCFA;
+import hu.bme.mit.theta.xcfa.model.XcfaLabel;
 import hu.bme.mit.theta.xcfa.model.utils.FrontendXcfaBuilder;
 import hu.bme.mit.theta.xcfa.passes.XcfaPassManager;
 import hu.bme.mit.theta.xcfa.passes.procedurepass.*;
@@ -160,6 +163,10 @@ public class ProbCli {
 
 		try {
 			registerProbabilisticPasses();
+			if(lbe)
+				SimpleLbePass.level = SimpleLbePass.LBELevel.LBE_SEQ;
+			else
+				SimpleLbePass.level = SimpleLbePass.LBELevel.NO_LBE;
 			XCFA xcfa = xcfaBuilder.build();
 			CFA cfa = xcfa.createCFA();
 			if(cfaVis != null) {
@@ -210,9 +217,16 @@ public class ProbCli {
 //		XcfaPassManager.addProcedurePass(new UnusedVarRemovalPass());		// Variables with no usages are removed
 //		XcfaPassManager.addProcedurePass(new NoReadVarRemovalPass());		// Variables without a consumer are removed
 		XcfaPassManager.addProcedurePass(new RemoveUnreachable());			// Remove paths that are unreachable
-		XcfaPassManager.addProcedurePass(new EmptyEdgeRemovalPass());		// Removes empty edges by merging them
+
+		// Dominated by LBE
 
 		XcfaPassManager.addProcedurePass(new SimplifyAssumptions());
+		XcfaPassManager.addProcedurePass(new VerySimpleLbePass());
+		XcfaPassManager.addProcedurePass(new EmptyEdgeRemovalPass());		// Removes empty edges by merging them
+		XcfaPassManager.addProcedurePass(new SeparatorPass(
+				(l) -> l instanceof XcfaLabel.StmtXcfaLabel &&
+						(l.getStmt() instanceof HavocStmt || l.getStmt() instanceof NonDetStmt || l.getStmt() instanceof ProbStmt) //includes probstmt
+				));
 	}
 
 	private void handleCfa(final CFA cfa) {

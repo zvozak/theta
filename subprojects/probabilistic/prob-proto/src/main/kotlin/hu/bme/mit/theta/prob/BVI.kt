@@ -65,53 +65,13 @@ fun <S : State, LAbs, LConc> BVI(
     LCinit: Map<ChoiceNode<S, LConc>, Double>,
     UAinit: Map<StateNode<S, LAbs>, Double>,
     UCinit: Map<ChoiceNode<S, LConc>, Double>,
-    checkedStateNodes: List<StateNode<S, LAbs>>
+    checkedStateNodes: List<StateNode<S, LAbs>>,
+    collapseMecs: Boolean = false // Uses contraction instead of deflation if the playerA and playerC goals coincide
 ): AbstractionGameCheckResult<S, LAbs, LConc> {
-    // TODO: check performance with array conversion
-    var LA: HashMap<StateNode<S,LAbs>, Double> = HashMap(LAinit) // Lower approximation for Abstraction node values
-    var LC: HashMap<ChoiceNode<S, LConc>, Double> = HashMap(LCinit) // Lower approximation for Concrete choice node values
-    var UA: HashMap<StateNode<S,LAbs>, Double> = HashMap(UAinit) // Upper approximation for Abstraction node values
-    var UC: HashMap<ChoiceNode<S, LConc>, Double> = HashMap(UCinit) // Upper approximation for Concrete choice node values
 
-    var iters = 0
-    do {
-        iters++
-        // Bellman updates
-        val LAnext = HashMap(LA)
-        val LCnext = HashMap(LC)
-        val UAnext = HashMap(UA)
-        val UCnext = HashMap(UC)
+    val collapseMecs = collapseMecs && playerAGoal == playerCGoal
 
-        for (stateNode in LA.keys) {
-            val lEdgeValues = stateNode.outgoingEdges.map { edge ->
-                LC[edge.end]!!
-            }
-            LAnext[stateNode] = playerAGoal.select(lEdgeValues) ?: LAnext[stateNode]
-
-            val uEdgeValues = stateNode.outgoingEdges.map { edge ->
-                UC[edge.end]!!
-            }
-            UAnext[stateNode] = playerAGoal.select(uEdgeValues) ?: UAnext[stateNode]
-        }
-
-        for (choiceNode in LC.keys) {
-            val lEdgeValues = choiceNode.outgoingEdges.map { edge ->
-                edge.end.pmf.entries.sumByDouble { it.value * LA[it.key]!! }
-            }
-            LCnext[choiceNode] = playerCGoal.select(lEdgeValues)
-
-            val uEdgeValues = choiceNode.outgoingEdges.map { edge ->
-                edge.end.pmf.entries.sumByDouble { it.value * UA[it.key]!! }
-            }
-            UCnext[choiceNode] = playerCGoal.select(uEdgeValues)
-        }
-
-        LA = LAnext
-        LC = LCnext
-        UA = UAnext
-        UC = UCnext
-
-        // Computing MSECs for deflation
+    fun precomputeMecs(): List<Pair<Set<StateNode<S, LAbs>>, Set<ChoiceNode<S, LConc>>>> {
         val stateNodeIndices = hashMapOf<StateNode<S, LAbs>, Int>()
         var i = 0
         val wrappedStateNodes = game.stateNodes.map {
@@ -127,27 +87,10 @@ fun <S : State, LAbs, LConc> BVI(
 
         // Filtered for MSEC computation: only optimal edges
         val stateNodeEdges = wrappedStateNodes.map { wrappedNode ->
-            var filteredEdges = wrappedNode.stateNode.outgoingEdges.toList()
-            if(playerAGoal == OptimType.MIN)
-                filteredEdges = filteredEdges.filterNot {
-                    val edgeValue = LC[it.end]!!
-                    // TODO: check if relaxed comparison (double equality) is needed
-                    return@filterNot edgeValue > LA[wrappedNode.stateNode]!!
-                }
-            filteredEdges.map { choiceNodeIndices[it.end]!! }.toMutableList()
+            wrappedNode.stateNode.outgoingEdges.toList().map { choiceNodeIndices[it.end]!! }.toMutableList()
         }
         val choiceNodeEdges = wrappedChoiceNodes.map { wrappedNode ->
-            var filteredEdges = wrappedNode.choiceNode.outgoingEdges.toList()
-            if(playerCGoal == OptimType.MIN) {
-                filteredEdges = filteredEdges.filterNot { edge ->
-                    val edgeValue = edge.end.pmf.entries
-                        .sumByDouble { (stateNode, prob) ->
-                            prob * (LA[stateNode]!!)
-                        }
-                    return@filterNot edgeValue > LC[wrappedNode.choiceNode]!!
-                }
-            }
-            val pre = filteredEdges.flatMap {
+            val pre = wrappedNode.choiceNode.outgoingEdges.toList().flatMap {
                 it.end.pmf.keys.map { stateNodeIndices[it]!! }
             }
             pre.toSet().toMutableList()
@@ -157,35 +100,173 @@ fun <S : State, LAbs, LConc> BVI(
         val ERG = EdgeRelationGraph(ergNodes, ergEdges.toMutableList())
         // As non-optimal minimizer actions have been removed, the computed MECs are MSECs
         // See Kelmendi et. al.: Value Iteration for Simple Stochastic Games..., Lemma 2.
-        val msecs = computeMECs(ERG, stateNodeIndices, choiceNodeIndices)
+        return computeMECs(ERG, stateNodeIndices, choiceNodeIndices)
+    }
+    val fullMecs = precomputeMecs()
 
-        // Deflation
-        for (msec in msecs) {
-            var bestExit = 0.0
-            if(playerAGoal == OptimType.MAX) {
-                bestExit = msec.first.flatMap {
-                    it.outgoingEdges.filter { it.end !in msec.second }.map { UC[it.end]!! }
-                }.max() ?: 0.0
+    val mecExitingEdgesState = hashMapOf<StateNode<S, LAbs>, List<AbstractionGame.AbstractionChoiceEdge<S, LAbs>>>()
+    val mecExitingEdgesChoice = hashMapOf<ChoiceNode<S, LConc>, List<AbstractionGame.ConcreteChoiceEdge<S, LConc>>>()
+    for (mec in fullMecs) {
+        val anyExiting =
+            mec.first.any { it.outgoingEdges.any { it.end !in mec.second } } ||
+            mec.second.any { it.outgoingEdges.any { it.end.pmf.keys.any {it !in mec.first} } }
+        if(!anyExiting) continue
+        for (stateNode in mec.first) {
+            mecExitingEdgesState[stateNode] = stateNode.outgoingEdges.filter { it.end !in mec.second }
+        }
+        for (choiceNode in mec.second) {
+            mecExitingEdgesChoice[choiceNode] = choiceNode.outgoingEdges.filter { it.end.pmf.keys.any {it !in mec.first} }
+        }
+    }
+
+    var LA: HashMap<StateNode<S,LAbs>, Double> = HashMap(LAinit) // Lower approximation for Abstraction node values
+    var LC: HashMap<ChoiceNode<S, LConc>, Double> = HashMap(LCinit) // Lower approximation for Concrete choice node values
+    var UA: HashMap<StateNode<S,LAbs>, Double> = HashMap(UAinit) // Upper approximation for Abstraction node values
+    var UC: HashMap<ChoiceNode<S, LConc>, Double> = HashMap(UCinit) // Upper approximation for Concrete choice node values
+    var iters = 0
+    do {
+        iters++
+        // Bellman updates
+        val LAnext = HashMap(LA)
+        val LCnext = HashMap(LC)
+        val UAnext = HashMap(UA)
+        val UCnext = HashMap(UC)
+
+        for (stateNode in LA.keys) {
+            val lEdgeValues =
+                if (collapseMecs) (mecExitingEdgesState[stateNode]?:stateNode.outgoingEdges).map { edge ->
+                    LC[edge.end]!!
+                } + listOf(if(playerAGoal==OptimType.MAX) 0.0 else 1.0)
+                else stateNode.outgoingEdges.map { edge ->
+                    LC[edge.end]!!
+                }
+            LAnext[stateNode] = playerAGoal.select(lEdgeValues) ?: LAnext[stateNode]
+
+            val uEdgeValues =
+                if (collapseMecs) (mecExitingEdgesState[stateNode]?:stateNode.outgoingEdges).map { edge ->
+                    UC[edge.end]!!
+                } + listOf(if(playerAGoal==OptimType.MAX) 0.0 else 1.0)
+                else stateNode.outgoingEdges.map { edge ->
+                    UC[edge.end]!!
+                }
+            UAnext[stateNode] = playerAGoal.select(uEdgeValues) ?: UAnext[stateNode]
+        }
+
+        for (choiceNode in LC.keys) {
+            val lEdgeValues =
+                if (collapseMecs) (mecExitingEdgesChoice[choiceNode] ?: choiceNode.outgoingEdges).map { edge ->
+                    edge.end.pmf.entries.sumByDouble { it.value * LA[it.key]!! }
+                } + listOf(if (playerAGoal == OptimType.MAX) 0.0 else 1.0)
+                else choiceNode.outgoingEdges.map { edge ->
+                    edge.end.pmf.entries.sumByDouble { it.value * LA[it.key]!! }
+                }
+            LCnext[choiceNode] = playerCGoal.select(lEdgeValues)
+
+            val uEdgeValues =
+                if (collapseMecs) (mecExitingEdgesChoice[choiceNode] ?: choiceNode.outgoingEdges).map { edge ->
+                    edge.end.pmf.entries.sumByDouble { it.value * UA[it.key]!! }
+                } + listOf(if (playerAGoal == OptimType.MAX) 0.0 else 1.0)
+                else choiceNode.outgoingEdges.map { edge ->
+                    edge.end.pmf.entries.sumByDouble { it.value * UA[it.key]!! }
+                }
+            UCnext[choiceNode] = playerCGoal.select(uEdgeValues)
+        }
+
+        LA = LAnext
+        LC = LCnext
+        UA = UAnext
+        UC = UCnext
+
+        // Computing MSECs for deflation
+        if (collapseMecs) {
+            for (mec in fullMecs) {
+                val LOptim = playerAGoal.select(mec.first.map { LA[it]!! }+mec.second.map { LC[it]!! })
+                val UOptim = playerAGoal.select(mec.first.map { UA[it]!! }+mec.second.map { UC[it]!! })
+                for (stateNode in mec.first) {
+                    LA[stateNode] = LOptim!!
+                    UA[stateNode] = UOptim!!
+                }
+                for (choiceNode in mec.second) {
+                    LC[choiceNode] = LOptim!!
+                    UC[choiceNode] = UOptim!!
+                }
             }
-            if(playerCGoal == OptimType.MAX) {
-                val bestAExit =msec.second.flatMap {
-                    it.outgoingEdges
-                        .filter { it.end.pmf.keys.any { it !in msec.first } }
-                        .map {
-                            it.end.pmf.entries.sumByDouble { (stateNode, prob) ->
-                                prob * (UA[stateNode]!!)
+        } else {
+            val stateNodeIndices = hashMapOf<StateNode<S, LAbs>, Int>()
+            var i = 0
+            val wrappedStateNodes = game.stateNodes.map {
+                stateNodeIndices[it] = i++
+                WrappedStateNode<S, LAbs, LConc>(it)
+            }
+            val choiceNodeIndices = hashMapOf<ChoiceNode<S, LConc>, Int>()
+            val wrappedChoiceNodes = game.concreteChoiceNodes.map {
+                choiceNodeIndices[it] = i++
+                WrappedChoiceNode<S, LAbs, LConc>(it)
+            }
+            val ergNodes = wrappedStateNodes + wrappedChoiceNodes
+
+            // Filtered for MSEC computation: only optimal edges
+            val stateNodeEdges = wrappedStateNodes.map { wrappedNode ->
+                var filteredEdges = wrappedNode.stateNode.outgoingEdges.toList()
+                if(playerAGoal == OptimType.MIN)
+                    filteredEdges = filteredEdges.filterNot {
+                        val edgeValue = LC[it.end]!!
+                        // TODO: check if relaxed comparison (double equality) is needed
+                        return@filterNot edgeValue > LA[wrappedNode.stateNode]!!
+                    }
+                filteredEdges.map { choiceNodeIndices[it.end]!! }.toMutableList()
+            }
+            val choiceNodeEdges = wrappedChoiceNodes.map { wrappedNode ->
+                var filteredEdges = wrappedNode.choiceNode.outgoingEdges.toList()
+                if(playerCGoal == OptimType.MIN) {
+                    filteredEdges = filteredEdges.filterNot { edge ->
+                        val edgeValue = edge.end.pmf.entries
+                            .sumByDouble { (stateNode, prob) ->
+                                prob * (LA[stateNode]!!)
                             }
-                        }
-                }.max() ?: 0.0
-                if(bestAExit > bestExit) bestExit = bestAExit
+                        return@filterNot edgeValue > LC[wrappedNode.choiceNode]!!
+                    }
+                }
+                val pre = filteredEdges.flatMap {
+                    it.end.pmf.keys.map { stateNodeIndices[it]!! }
+                }
+                pre.toSet().toMutableList()
             }
+            val ergEdges = stateNodeEdges + choiceNodeEdges
 
-            for (stateNode in msec.first) {
-                UA[stateNode] = min(UA[stateNode]!!, bestExit)
-            }
+            val ERG = EdgeRelationGraph(ergNodes, ergEdges.toMutableList())
+            // As non-optimal minimizer actions have been removed, the computed MECs are MSECs
+            // See Kelmendi et. al.: Value Iteration for Simple Stochastic Games..., Lemma 2.
+            val msecs = computeMECs(ERG, stateNodeIndices, choiceNodeIndices)
 
-            for (choiceNode in msec.second) {
-                UC[choiceNode] = min(UC[choiceNode]!!, bestExit)
+            // Deflation
+            for (msec in msecs) {
+                var bestExit = 0.0
+                if(playerAGoal == OptimType.MAX) {
+                    bestExit = msec.first.flatMap {
+                        it.outgoingEdges.filter { it.end !in msec.second }.map { UC[it.end]!! }
+                    }.max() ?: 0.0
+                }
+                if(playerCGoal == OptimType.MAX) {
+                    val bestAExit = msec.second.flatMap {
+                        it.outgoingEdges
+                            .filter { it.end.pmf.keys.any { it !in msec.first } }
+                            .map {
+                                it.end.pmf.entries.sumByDouble { (stateNode, prob) ->
+                                    prob * (UA[stateNode]!!)
+                                }
+                            }
+                    }.max() ?: 0.0
+                    if(bestAExit > bestExit) bestExit = bestAExit
+                }
+
+                for (stateNode in msec.first) {
+                    UA[stateNode] = min(UA[stateNode]!!, bestExit)
+                }
+
+                for (choiceNode in msec.second) {
+                    UC[choiceNode] = min(UC[choiceNode]!!, bestExit)
+                }
             }
         }
 
