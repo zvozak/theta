@@ -83,11 +83,11 @@ class OTFMDPAbstractionTests {
         val explInitPrec = GlobalCfaPrec.create(ExplPrec.empty())
 
 
-        val checkResult = checkPCFA(
+        val checkResult = checkThresholdProperty(
             explTransFunc, lts, explInitFunc,
             explInitPrec,
             model.errorLoc.get(), model.finalLoc.get(), OptimType.MAX,
-            0.1, PropertyType.LESS_THAN,
+            0.1, ThresholdType.LESS_THAN,
             GlobalCfaExplRefiner(), nearestRefinableStateSelector
         )
 

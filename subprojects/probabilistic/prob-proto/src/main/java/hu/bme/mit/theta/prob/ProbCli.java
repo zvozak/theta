@@ -46,10 +46,7 @@ import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileWriter;
+import java.io.*;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -96,13 +93,22 @@ public class ProbCli {
 	double propertyThreshold = 0.01;
 
 	@Parameter(names = "--property-type", description = "")
-	PropertyType propertyType = PropertyType.LESS_THAN;
+	ThresholdType thresholdType = ThresholdType.LESS_THAN;
 
 	@Parameter(names = "--optim-type", description = "")
 	OptimType optimType = OptimType.MAX;
 
 	@Parameter(names = "--lbe", description = "Whether to use large-block encoding")
 	boolean lbe = false;
+
+	@Parameter(names = "--prop", description = "Path of a property file")
+	String prop = "";
+
+	@Parameter(names = "--exact", description = "Whether to compute an approximation of the exact probability itself instead of verifying a threshold property")
+	boolean exact = false;
+
+	@Parameter(names = "--tolerance", description = "Tolerance of the \"exact\" computation")
+	double tolerance = 1e-7;
 
 	//////////// CONFIGURATION OPTIONS END ////////////
 
@@ -218,8 +224,6 @@ public class ProbCli {
 //		XcfaPassManager.addProcedurePass(new NoReadVarRemovalPass());		// Variables without a consumer are removed
 		XcfaPassManager.addProcedurePass(new RemoveUnreachable());			// Remove paths that are unreachable
 
-		// Dominated by LBE
-
 		XcfaPassManager.addProcedurePass(new SimplifyAssumptions());
 		XcfaPassManager.addProcedurePass(new VerySimpleLbePass());
 		XcfaPassManager.addProcedurePass(new EmptyEdgeRemovalPass());		// Removes empty edges by merging them
@@ -230,15 +234,41 @@ public class ProbCli {
 	}
 
 	private void handleCfa(final CFA cfa) {
+		if(!prop.isBlank()) {
+			String read;
+			try {
+				try(BufferedReader bufferedReader = new BufferedReader(new FileReader(prop))) {
+					read = bufferedReader.readLine();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+			String[] split = read.split(" ");
+			optimType = OptimType.valueOf(split[0]);
+			switch (split[1]) {
+				case "exact":
+					exact = true;
+					tolerance = Double.parseDouble(split[2]);
+					break;
+				default:
+					thresholdType = ThresholdType.valueOf(split[1]);
+					propertyThreshold = Double.parseDouble(split[2]);
+					break;
+			}
+		}
+
 		var config = new PCFAConfig(
 				domain,
 				refinableSelection,
 				precisionLocality,
 				predicatePropagation,
-				propertyType,
+				thresholdType,
 				propertyThreshold,
 				optimType,
-				lbe
+				lbe,
+				exact,
+				tolerance
 		);
 		ProbCheckerCLIKt.handlePCFA(cfa, config);
 	}

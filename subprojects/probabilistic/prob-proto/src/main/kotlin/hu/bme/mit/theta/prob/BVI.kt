@@ -35,6 +35,11 @@ fun <T> OptimType.argSelect(m: List<Pair<T, Double>>): T?  =
         OptimType.MAX -> m.maxBy { it.second }?.first
         OptimType.MIN -> m.minBy { it.second }?.first
     }
+fun OptimType.unitForProb(): Double =
+    when (this) {
+        OptimType.MAX -> 0.0
+        OptimType.MIN -> 1.0
+    }
 
 
 // TODO: this is wasteful
@@ -134,19 +139,27 @@ fun <S : State, LAbs, LConc> BVI(
 
         for (stateNode in LA.keys) {
             val lEdgeValues =
-                if (collapseMecs) (mecExitingEdgesState[stateNode]?:stateNode.outgoingEdges).map { edge ->
-                    LC[edge.end]!!
-                } + listOf(if(playerAGoal==OptimType.MAX) 0.0 else 1.0)
-                else stateNode.outgoingEdges.map { edge ->
+                if (collapseMecs) {
+                    var pre = (mecExitingEdgesState[stateNode] ?: stateNode.outgoingEdges).map { edge ->
+                        LC[edge.end]!!
+                    }
+                    if(mecExitingEdgesState[stateNode] != null)
+                        pre = pre + listOf(if (playerAGoal == OptimType.MAX) 0.0 else 1.0)
+                    pre
+                } else stateNode.outgoingEdges.map { edge ->
                     LC[edge.end]!!
                 }
             LAnext[stateNode] = playerAGoal.select(lEdgeValues) ?: LAnext[stateNode]
 
             val uEdgeValues =
-                if (collapseMecs) (mecExitingEdgesState[stateNode]?:stateNode.outgoingEdges).map { edge ->
-                    UC[edge.end]!!
-                } + listOf(if(playerAGoal==OptimType.MAX) 0.0 else 1.0)
-                else stateNode.outgoingEdges.map { edge ->
+                if (collapseMecs) {
+                    var pre = (mecExitingEdgesState[stateNode] ?: stateNode.outgoingEdges).map { edge ->
+                        UC[edge.end]!!
+                    }
+                    if(mecExitingEdgesState[stateNode] != null)
+                        pre = pre + listOf(if (playerAGoal == OptimType.MAX) 0.0 else 1.0)
+                    pre
+                } else stateNode.outgoingEdges.map { edge ->
                     UC[edge.end]!!
                 }
             UAnext[stateNode] = playerAGoal.select(uEdgeValues) ?: UAnext[stateNode]

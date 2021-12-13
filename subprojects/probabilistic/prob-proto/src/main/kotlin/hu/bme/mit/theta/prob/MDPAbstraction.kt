@@ -32,7 +32,7 @@ fun <S: State, LAbs, LConc> strategyFromValues(
 const val doubleEquivalenceThreshold = 1e-6
 fun doubleEquals(a: Double, b: Double) = Math.abs(a-b) < doubleEquivalenceThreshold
 
-enum class PropertyType(val check: (threshold: Double, v: Double) -> Boolean) {
+enum class ThresholdType(val check: (threshold: Double, v: Double) -> Boolean) {
     LESS_THAN({threshold, v -> v < threshold}),
     GREATER_THAN({threshold, v -> v > threshold})
 }
@@ -44,13 +44,13 @@ data class PCFACheckResult(
 )
 
 typealias PcfaStateNode<S> = StateNode<CfaState<S>, CfaAction>
-fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkPCFA(
+fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkThresholdProperty(
     transFunc: CfaGroupedTransferFunction<S, SubP>,
     lts: CfaSbeLts, // LBE not supported yet!
     init: CfaInitFunc<S, SubP>,
     initialPrec: P,
     errorLoc: CFA.Loc, finalLoc: CFA.Loc,
-    nonDetGoal: OptimType, propertyThreshold: Double, propertyType: PropertyType,
+    nonDetGoal: OptimType, propertyThreshold: Double, thresholdType: ThresholdType,
     precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>,
     refinableStateSelector: RefinableStateSelector
 ): PCFACheckResult {
@@ -60,46 +60,16 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkPCFA(
     while (true) {
         iters++
         val game = computeGameAbstraction(init, lts, transFunc, currPrec)
-        val initNodes = game.initNodes.toList()
 
         // Computing the approximation for the property under check for the abstraction
 
-        val LAinit = hashMapOf(*game.stateNodes.map {
-            it to if (it.state.loc == errorLoc) 1.0 else 0.0
-        }.toTypedArray())
-        val LCinit = hashMapOf(*game.concreteChoiceNodes.map { it to 0.0 }.toTypedArray())
-        val UAinit = hashMapOf(*game.stateNodes.map {
-            it to if (it.state.loc == finalLoc) 0.0 else 1.0
-        }.toTypedArray())
-        val UCinit = hashMapOf(*game.concreteChoiceNodes.map { it to 1.0 }.toTypedArray())
+        val (minCheckResult, maxCheckResult) = analyzeGame(game, errorLoc, finalLoc, nonDetGoal)
 
-        val convergenceThreshold = 1e-6
+        val max = nonDetGoal.select(game.initNodes.map { maxCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
+        val min = nonDetGoal.select(game.initNodes.map { minCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
 
-        val minCheckResult = BVI(
-            game,
-            OptimType.MIN, nonDetGoal,
-            convergenceThreshold,
-            LAinit, LCinit,
-            UAinit, UCinit,
-            initNodes,
-            collapseMecs = false
-        )
-
-        val maxCheckResult = BVI(
-            game,
-            OptimType.MAX, nonDetGoal,
-            convergenceThreshold,
-            LAinit, LCinit,
-            UAinit, UCinit,
-            initNodes,
-            collapseMecs = false
-        )
-
-        val max = nonDetGoal.select(initNodes.map { maxCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
-        val min = nonDetGoal.select(initNodes.map { minCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
-
-        val maxSatisfies = propertyType.check(propertyThreshold, max)
-        val minSatisfies = propertyType.check(propertyThreshold, min)
+        val maxSatisfies = thresholdType.check(propertyThreshold, max)
+        val minSatisfies = thresholdType.check(propertyThreshold, min)
 
         println("Iter $iters: ")
         println("    $currPrec")
@@ -123,6 +93,91 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkPCFA(
             )
         }
     }
+}
+
+fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> computeProb(
+    transFunc: CfaGroupedTransferFunction<S, SubP>,
+    lts: CfaSbeLts, // LBE not supported yet!
+    init: CfaInitFunc<S, SubP>,
+    initialPrec: P,
+    errorLoc: CFA.Loc, finalLoc: CFA.Loc,
+    nonDetGoal: OptimType, tolerance: Double,
+    precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>,
+    refinableStateSelector: RefinableStateSelector
+): PCFACheckResult {
+    var currPrec = initialPrec
+    var iters = 0
+
+    while (true) {
+        iters++
+        val game = computeGameAbstraction(init, lts, transFunc, currPrec)
+
+        // Computing the approximation for the property under check for the abstraction
+
+        val (minCheckResult, maxCheckResult) = analyzeGame(game, errorLoc, finalLoc, nonDetGoal)
+
+        val max = nonDetGoal.select(game.initNodes.map { maxCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
+        val min = nonDetGoal.select(game.initNodes.map { minCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
+
+        println("Iter $iters: ")
+        println("    $currPrec")
+        println("    [$min, $max]")
+
+        if (max-min < tolerance) {
+            return PCFACheckResult(true, min, max)
+        } else {
+            // Perform refinement
+            val stateToRefine = refinableStateSelector.select(
+                game,
+                minCheckResult.abstractionNodeValues, maxCheckResult.abstractionNodeValues,
+                minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues,
+            )!!
+            currPrec = precRefiner.refine(
+                game, stateToRefine, currPrec,
+                minCheckResult.abstractionNodeValues, maxCheckResult.abstractionNodeValues,
+                minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues
+            )
+        }
+    }
+}
+
+private fun <S : ExprState> analyzeGame(
+    game: AbstractionGame<CfaState<S>, CfaAction, Unit>,
+    errorLoc: CFA.Loc,
+    finalLoc: CFA.Loc,
+    nonDetGoal: OptimType
+): Pair<AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>, AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>> {
+    val LAinit = hashMapOf(*game.stateNodes.map {
+        it to if (it.state.loc == errorLoc) 1.0 else 0.0
+    }.toTypedArray())
+    val LCinit = hashMapOf(*game.concreteChoiceNodes.map { it to 0.0 }.toTypedArray())
+    val UAinit = hashMapOf(*game.stateNodes.map {
+        it to if (it.state.loc == finalLoc) 0.0 else 1.0
+    }.toTypedArray())
+    val UCinit = hashMapOf(*game.concreteChoiceNodes.map { it to 1.0 }.toTypedArray())
+
+    val convergenceThreshold = 1e-6
+
+    val minCheckResult = BVI(
+        game,
+        OptimType.MIN, nonDetGoal,
+        convergenceThreshold,
+        LAinit, LCinit,
+        UAinit, UCinit,
+        game.initNodes.toList(),
+        collapseMecs = true
+    )
+
+    val maxCheckResult = BVI(
+        game,
+        OptimType.MAX, nonDetGoal,
+        convergenceThreshold,
+        LAinit, LCinit,
+        UAinit, UCinit,
+        game.initNodes.toList(),
+        collapseMecs = true
+    )
+    return Pair(minCheckResult, maxCheckResult)
 }
 
 fun <P : Prec, S : ExprState> computeGameAbstraction(

@@ -9,6 +9,7 @@ import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.analysis.pred.ExprSplitters
 import hu.bme.mit.theta.analysis.pred.PredPrec
 import hu.bme.mit.theta.analysis.pred.PredState
+import hu.bme.mit.theta.cfa.CFA
 import hu.bme.mit.theta.cfa.analysis.CfaAction
 import hu.bme.mit.theta.cfa.analysis.CfaState
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
@@ -44,7 +45,7 @@ fun <S: State, LConc> isRefinable(
     val min = choices.mapNotNull(VCmin::get).min()!!
     val maxChoices = choices.filter { doubleEquals(max, VCmax[it]!!) }.toSet()
     val minChoices = choices.filter { doubleEquals(min, VCmin[it]!!) }.toSet()
-    return maxChoices.minus(minChoices).isNotEmpty()
+    return maxChoices!=minChoices
 }
 
 object coarsestRefinableStateSelector: RefinableStateSelector {
@@ -54,6 +55,21 @@ object coarsestRefinableStateSelector: RefinableStateSelector {
         VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
     ): StateNode<S, LAbs>? {
         return game.stateNodes.filter{ isRefinable(it, VCmax, VCmin)}.maxBy { VAmax[it]!!-VAmin[it]!! } !!
+    }
+}
+
+object randomizedCoarsestRefinableStateSelector: RefinableStateSelector {
+    override fun <S : State, LAbs, LConc> select(
+        game: AbstractionGame<S, LAbs, LConc>,
+        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
+        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
+    ): StateNode<S, LAbs>? {
+        val refineables = game.stateNodes.filter { isRefinable(it, VCmax, VCmin) }
+        val diffs = refineables.map { it to VAmax[it]!! - VAmin[it]!! }
+        val max = diffs.maxBy { it.second }!!
+        val maxRefineables = diffs.filter { it.second == max.second }
+        val rand = Random().nextInt(maxRefineables.size)
+        return maxRefineables[rand].first
     }
 }
 
@@ -279,7 +295,7 @@ object nonPropagatingPropagator: PredicatePropagator {
     }
 }
 
-object shortestTracePropagator: PredicatePropagator {
+object gameTracePropagator: PredicatePropagator {
     override fun <LAbs : StmtAction, LConc> propagate(
         game: AbstractionGame<CfaState<PredState>, LAbs, LConc>,
         refinedState: StateNode<CfaState<PredState>, LAbs>,
@@ -339,3 +355,74 @@ object shortestTracePropagator: PredicatePropagator {
     }
 
 }
+
+object cfaEdgePropagator: PredicatePropagator {
+    override fun <LAbs : StmtAction, LConc> propagate(
+        game: AbstractionGame<CfaState<PredState>, LAbs, LConc>,
+        refinedState: StateNode<CfaState<PredState>, LAbs>,
+        origPrecision: LocalCfaPrec<PredPrec>,
+        newPredicates: List<Expr<BoolType>>
+    ): LocalCfaPrec<PredPrec> {
+        // Use the first predecessor maps in the game to find a shortest play,
+        // and add the new predicates to each location
+        // TODO: this is a shortest play only if the game was created using BFS,
+        //       which is true for the BVI-based analysis (full state-space exploration),
+        //       but won't be for BRTDP (simulation-based partial state-space exploration)
+
+        val addedPreds = hashMapOf<CFA.Loc, List<Expr<BoolType>>>()
+        var newPrec = origPrecision
+        fun refinePrec(
+            loc: CFA.Loc,
+            newPreds: List<Expr<BoolType>>
+        ) {
+            val origLocalPrec = newPrec.getPrec(loc)
+            val newLocalPrec = origLocalPrec.join(PredPrec.of(newPreds))
+            addedPreds[loc] = newPreds
+            newPrec = newPrec.refine(loc, newLocalPrec)
+        }
+        val nonConstantPreds = newPredicates.filter {
+            // TODO: stop at first var
+            val l = arrayListOf<VarDecl<*>>();
+            collectVars(it, l)
+            l.size>0
+        }
+
+        val l = refinedState.state.loc
+        refinePrec(l, nonConstantPreds)
+
+        var edges = l.inEdges
+
+        // TODO: this won't work if the init loc is part of a loop
+        while (edges.isNotEmpty()) {
+            var nonEmpty = false
+
+            for (edge in edges) {
+                val preconditions = addedPreds[edge.target]!!.map {
+                    val stmt = edge.stmt
+                    val wps = WpState.of(it)
+                    wps.wep(stmt).expr
+                }
+                val currPreds = preconditions
+                    .flatMap(ExprSplitters.atoms()::apply)
+                    .toSet()
+                    .filter {
+                        // TODO: stop at first var
+                        val l = arrayListOf<VarDecl<*>>();
+                        collectVars(it, l)
+                        l.size>0
+                    }
+                    .toList()
+                if(currPreds.isNotEmpty()) nonEmpty = true
+                refinePrec(edge.source, currPreds)
+            }
+
+            val sources = edges.map { it.source }.toSet()
+            edges = sources.flatMap { it.inEdges }.filter { it.source !in addedPreds.keys }
+            if(!nonEmpty) break
+        }
+
+        return newPrec
+    }
+
+}
+
