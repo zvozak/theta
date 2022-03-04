@@ -4,26 +4,30 @@ import hu.bme.mit.theta.analysis.State
 import hu.bme.mit.theta.core.stmt.Stmt
 
 class AbstractionGame<S: State, LAbs, LConc>(
-    val stateNodes: MutableSet<StateNode<S, LAbs>> = hashSetOf(),
-    val initNodes: MutableSet<StateNode<S, LAbs>> = hashSetOf(),
-    val concreteChoiceNodes: MutableSet<ChoiceNode<S, LConc>> = hashSetOf(),
-    val abstractionChoiceEdges: MutableSet<AbstractionChoiceEdge<S, LAbs>> = hashSetOf(),
-    val concreteChoiceEdges: MutableSet<ConcreteChoiceEdge<S, LConc>> = hashSetOf()
+    val stateNodes: MutableSet<StateNode<S, LAbs, LConc>> = hashSetOf(),
+    val initNodes: MutableSet<StateNode<S, LAbs, LConc>> = hashSetOf(),
+    val concreteChoiceNodes: MutableSet<ChoiceNode<S, LAbs, LConc>> = hashSetOf(),
+    val abstractionChoiceEdges: MutableSet<AbstractionChoiceEdge<S, LAbs, LConc>> = hashSetOf(),
+    val concreteChoiceEdges: MutableSet<ConcreteChoiceEdge<S, LAbs, LConc>> = hashSetOf()
 ) {
 
     init {
         require(stateNodes.containsAll(initNodes))
     }
 
-    val stateNodeMap = hashMapOf<S, StateNode<S, LAbs>>()
-    private val firstPredecessorForStateNode = hashMapOf<StateNode<S, LAbs>, ConcreteChoiceEdge<S, LConc>>()
-    private val firstPredecessorForChoiceNode = hashMapOf<ChoiceNode<S, LConc>, AbstractionChoiceEdge<S, LAbs>>()
+    val stateNodeMap = hashMapOf<S, StateNode<S, LAbs, LConc>>()
+    private val firstPredecessorForStateNode = hashMapOf<StateNode<S, LAbs, LConc>, ConcreteChoiceEdge<S, LAbs, LConc>>()
+    private val firstPredecessorForChoiceNode = hashMapOf<ChoiceNode<S, LAbs, LConc>, AbstractionChoiceEdge<S, LAbs, LConc>>()
 
     /**
      * @param S The type representing abstract states
      * @param L The type used for labeling outgoing edges.
      */
-    class StateNode<S: State, L>(val state: S, val outgoingEdges: HashSet<AbstractionChoiceEdge<S, L>> = hashSetOf()) {
+    class StateNode<S: State, LAbs, LConc>(
+        val state: S,
+        val outgoingEdges: HashSet<AbstractionChoiceEdge<S, LAbs, LConc>> = hashSetOf(),
+        val incomingEdges: HashSet<ConcreteChoiceEdge<S, LAbs, LConc>> = hashSetOf()
+    ) {
         override fun toString(): String = state.toString()
     }
 
@@ -31,7 +35,10 @@ class AbstractionGame<S: State, LAbs, LConc>(
      * @param S The type representing abstract states
      * @param L The type used for labeling outgoing edges.
      */
-    class ChoiceNode<S: State, L>(val outgoingEdges: HashSet<ConcreteChoiceEdge<S, L>> = hashSetOf()) {
+    class ChoiceNode<S: State, LAbs, LConc>(
+        val outgoingEdges: HashSet<ConcreteChoiceEdge<S, LAbs, LConc>> = hashSetOf(),
+        val incomingEdges: HashSet<AbstractionChoiceEdge<S, LAbs, LConc>> = hashSetOf()
+    ) {
         override fun toString(): String {
             return "{${outgoingEdges.map { it.end.toString() }.joinToString(", ")}}"
         }
@@ -44,7 +51,10 @@ class AbstractionGame<S: State, LAbs, LConc>(
      * @property end The concrete choice node this edge enters.
      * @property label The label of the edge, mostly an action whose application leads to going through this edge.
      */
-    class AbstractionChoiceEdge<S: State, L>(val start: StateNode<S, L>, val end: ChoiceNode<S, *>, val label: L) {
+    class AbstractionChoiceEdge<S: State, LAbs, LConc>(
+        val start: StateNode<S, LAbs, LConc>,
+        val end: ChoiceNode<S, LAbs, LConc>,
+        val label: LAbs) {
         init {
             start.outgoingEdges.add(this)
         }
@@ -53,28 +63,31 @@ class AbstractionGame<S: State, LAbs, LConc>(
     /**
      * Class for representing edges between concrete choice nodes and distributions
      */
-    class ConcreteChoiceEdge<S: State, L>(val start: ChoiceNode<S, L>, val end: EnumeratedDistribution<StateNode<S, *>, MutableList<Stmt>>, val label: L) {
+    class ConcreteChoiceEdge<S: State, LAbs, LConc>(
+        val start: ChoiceNode<S, LAbs, LConc>,
+        val end: EnumeratedDistribution<StateNode<S, LAbs, LConc>, MutableList<Stmt>>,
+        val label: LConc) {
         init {
             start.outgoingEdges.add(this)
         }
     }
 
-    fun createStateNode(s: S, isInitial: Boolean = false): StateNode<S, LAbs> =
-        StateNode<S, LAbs>(s).also {
+    fun createStateNode(s: S, isInitial: Boolean = false): StateNode<S, LAbs, LConc> =
+        StateNode<S, LAbs, LConc>(s).also {
             stateNodes.add(it)
             stateNodeMap[s] = it
             if(isInitial) initNodes.add(it)
         }
-    fun createStateNodes(ss: Collection<S>, isInitial: Boolean): List<StateNode<S, LAbs>> =
+    fun createStateNodes(ss: Collection<S>, isInitial: Boolean): List<StateNode<S, LAbs, LConc>> =
         ss.map { createStateNode(it, isInitial) }
 
-    fun createConcreteChoiceNode(): ChoiceNode<S, LConc> = ChoiceNode<S, LConc>().also { concreteChoiceNodes.add(it) }
+    fun createConcreteChoiceNode(): ChoiceNode<S, LAbs, LConc> = ChoiceNode<S, LAbs, LConc>().also { concreteChoiceNodes.add(it) }
 
     fun getOrCreateNodeWithChoices(
         choices: Set<Pair<
-                    EnumeratedDistribution<StateNode<S, *>, MutableList<Stmt>>, LConc
+                    EnumeratedDistribution<StateNode<S, LAbs, LConc>, MutableList<Stmt>>, LConc
                 >>
-    ): ChoiceNode<S, LConc> {
+    ): ChoiceNode<S, LAbs, LConc> {
         // TODO: make the search more efficient by pre-partitioning the list
         return concreteChoiceNodes.firstOrNull {
             it.outgoingEdges.size == choices.size &&
@@ -84,26 +97,27 @@ class AbstractionGame<S: State, LAbs, LConc>(
         }
     }
 
-    fun connect(s: StateNode<S, LAbs>, concreteChoiceNode: ChoiceNode<S, LConc>, label: LAbs) {
+    fun connect(s: StateNode<S, LAbs, LConc>, concreteChoiceNode: ChoiceNode<S, LAbs, LConc>, label: LAbs) {
         require(s in stateNodes)
         val edge = AbstractionChoiceEdge(s, concreteChoiceNode, label)
         abstractionChoiceEdges.add(edge)
         firstPredecessorForChoiceNode.putIfAbsent(concreteChoiceNode, edge)
+        concreteChoiceNode.incomingEdges.add(edge)
     }
 
     fun connect(
-        concreteChoiceNode: ChoiceNode<S, LConc>,
-        distribution: EnumeratedDistribution<StateNode<S, *>, MutableList<Stmt>>,
+        concreteChoiceNode: ChoiceNode<S, LAbs, LConc>,
+        distribution: EnumeratedDistribution<StateNode<S, LAbs, LConc>, MutableList<Stmt>>,
         label: LConc
     ) {
-        val edge = ConcreteChoiceEdge<S, LConc>(concreteChoiceNode, distribution, label)
+        val edge = ConcreteChoiceEdge(concreteChoiceNode, distribution, label)
         concreteChoiceEdges.add(edge)
         for (stateNode in distribution.pmf.keys) {
-            // TODO: get rid of that cast
-            firstPredecessorForStateNode.putIfAbsent(stateNode as StateNode<S, LAbs>, edge)
+            firstPredecessorForStateNode.putIfAbsent(stateNode, edge)
+            stateNode.incomingEdges.add(edge)
         }
     }
 
-    fun getFirstPredecessorEdge(stateNode: StateNode<S, LAbs>) = firstPredecessorForStateNode[stateNode]
-    fun getFirstPredecessorEdge(choiceNode: ChoiceNode<S, LConc>) = firstPredecessorForChoiceNode[choiceNode]
+    fun getFirstPredecessorEdge(stateNode: StateNode<S, LAbs, LConc>) = firstPredecessorForStateNode[stateNode]
+    fun getFirstPredecessorEdge(choiceNode: ChoiceNode<S, LAbs, LConc>) = firstPredecessorForChoiceNode[choiceNode]
 }

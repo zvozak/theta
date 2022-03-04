@@ -1,8 +1,7 @@
 package hu.bme.mit.theta.prob
 
 import hu.bme.mit.theta.analysis.State
-import hu.bme.mit.theta.prob.AbstractionGame.ChoiceNode
-import hu.bme.mit.theta.prob.AbstractionGame.StateNode
+import hu.bme.mit.theta.prob.AbstractionGame.*
 import hu.bme.mit.theta.prob.ERGNode.WrappedChoiceNode
 import hu.bme.mit.theta.prob.ERGNode.WrappedStateNode
 import java.util.*
@@ -45,9 +44,9 @@ fun OptimType.unitForProb(): Double =
 // TODO: this is wasteful
 private sealed class ERGNode<S: State, LA, LC>() {
     data class WrappedStateNode<S: State, LA, LC>(
-        val stateNode: StateNode<S, LA>): ERGNode<S, LA, LC>()
+        val stateNode: StateNode<S, LA, LC>): ERGNode<S, LA, LC>()
     data class WrappedChoiceNode<S: State, LA, LC>(
-        val choiceNode: ChoiceNode<S, LC>): ERGNode<S, LA, LC>()
+        val choiceNode: ChoiceNode<S, LA, LC>): ERGNode<S, LA, LC>()
 }
 
 private class EdgeRelationGraph<S: State, LA, LC>(
@@ -56,34 +55,34 @@ private class EdgeRelationGraph<S: State, LA, LC>(
 )
 
 data class AbstractionGameCheckResult<S: State, LAbs, LConc>(
-    val abstractionNodeValues: Map<StateNode<S, LAbs>, Double>,
-    val concreteChoiceNodeValues: Map<ChoiceNode<S, LConc>, Double>
+    val abstractionNodeValues: Map<StateNode<S, LAbs, LConc>, Double>,
+    val concreteChoiceNodeValues: Map<ChoiceNode<S, LAbs, LConc>, Double>
 )
 
-private typealias MECType<S, LA, LC> = Pair<Set<StateNode<S, LA>>, Set<ChoiceNode<S, LC>>>
+private typealias MECType<S, LA, LC> = Pair<Set<StateNode<S, LA, LC>>, Set<ChoiceNode<S, LA, LC>>>
 
 fun <S : State, LAbs, LConc> BVI(
     game: AbstractionGame<S, LAbs, LConc>,
     playerAGoal: OptimType, playerCGoal: OptimType,
     threshold: Double,
-    LAinit: Map<StateNode<S, LAbs>, Double>,
-    LCinit: Map<ChoiceNode<S, LConc>, Double>,
-    UAinit: Map<StateNode<S, LAbs>, Double>,
-    UCinit: Map<ChoiceNode<S, LConc>, Double>,
-    checkedStateNodes: List<StateNode<S, LAbs>>,
+    LAinit: Map<StateNode<S, LAbs, LConc>, Double>,
+    LCinit: Map<ChoiceNode<S, LAbs, LConc>, Double>,
+    UAinit: Map<StateNode<S, LAbs, LConc>, Double>,
+    UCinit: Map<ChoiceNode<S, LAbs, LConc>, Double>,
+    checkedStateNodes: List<StateNode<S, LAbs, LConc>>,
     collapseMecs: Boolean = false // Uses contraction instead of deflation if the playerA and playerC goals coincide
 ): AbstractionGameCheckResult<S, LAbs, LConc> {
 
     val collapseMecs = collapseMecs && playerAGoal == playerCGoal
 
-    fun precomputeMecs(): List<Pair<Set<StateNode<S, LAbs>>, Set<ChoiceNode<S, LConc>>>> {
-        val stateNodeIndices = hashMapOf<StateNode<S, LAbs>, Int>()
+    fun precomputeMecs(): List<Pair<Set<StateNode<S, LAbs, LConc>>, Set<ChoiceNode<S, LAbs, LConc>>>> {
+        val stateNodeIndices = hashMapOf<StateNode<S, LAbs, LConc>, Int>()
         var i = 0
         val wrappedStateNodes = game.stateNodes.map {
             stateNodeIndices[it] = i++
             WrappedStateNode<S, LAbs, LConc>(it)
         }
-        val choiceNodeIndices = hashMapOf<ChoiceNode<S, LConc>, Int>()
+        val choiceNodeIndices = hashMapOf<ChoiceNode<S, LAbs, LConc>, Int>()
         val wrappedChoiceNodes = game.concreteChoiceNodes.map {
             choiceNodeIndices[it] = i++
             WrappedChoiceNode<S, LAbs, LConc>(it)
@@ -109,8 +108,8 @@ fun <S : State, LAbs, LConc> BVI(
     }
     val fullMecs = precomputeMecs()
 
-    val mecExitingEdgesState = hashMapOf<StateNode<S, LAbs>, List<AbstractionGame.AbstractionChoiceEdge<S, LAbs>>>()
-    val mecExitingEdgesChoice = hashMapOf<ChoiceNode<S, LConc>, List<AbstractionGame.ConcreteChoiceEdge<S, LConc>>>()
+    val mecExitingEdgesState = hashMapOf<StateNode<S, LAbs, LConc>, List<AbstractionChoiceEdge<S, LAbs, LConc>>>()
+    val mecExitingEdgesChoice = hashMapOf<ChoiceNode<S, LAbs, LConc>, List<ConcreteChoiceEdge<S, LAbs, LConc>>>()
     for (mec in fullMecs) {
         val anyExiting =
             mec.first.any { it.outgoingEdges.any { it.end !in mec.second } } ||
@@ -124,10 +123,10 @@ fun <S : State, LAbs, LConc> BVI(
         }
     }
 
-    var LA: HashMap<StateNode<S,LAbs>, Double> = HashMap(LAinit) // Lower approximation for Abstraction node values
-    var LC: HashMap<ChoiceNode<S, LConc>, Double> = HashMap(LCinit) // Lower approximation for Concrete choice node values
-    var UA: HashMap<StateNode<S,LAbs>, Double> = HashMap(UAinit) // Upper approximation for Abstraction node values
-    var UC: HashMap<ChoiceNode<S, LConc>, Double> = HashMap(UCinit) // Upper approximation for Concrete choice node values
+    var LA: HashMap<StateNode<S, LAbs, LConc>, Double> = HashMap(LAinit) // Lower approximation for Abstraction node values
+    var LC: HashMap<ChoiceNode<S, LAbs, LConc>, Double> = HashMap(LCinit) // Lower approximation for Concrete choice node values
+    var UA: HashMap<StateNode<S, LAbs, LConc>, Double> = HashMap(UAinit) // Upper approximation for Abstraction node values
+    var UC: HashMap<ChoiceNode<S, LAbs, LConc>, Double> = HashMap(UCinit) // Upper approximation for Concrete choice node values
     var iters = 0
     do {
         iters++
@@ -205,13 +204,13 @@ fun <S : State, LAbs, LConc> BVI(
                 }
             }
         } else {
-            val stateNodeIndices = hashMapOf<StateNode<S, LAbs>, Int>()
+            val stateNodeIndices = hashMapOf<StateNode<S, LAbs, LConc>, Int>()
             var i = 0
             val wrappedStateNodes = game.stateNodes.map {
                 stateNodeIndices[it] = i++
                 WrappedStateNode<S, LAbs, LConc>(it)
             }
-            val choiceNodeIndices = hashMapOf<ChoiceNode<S, LConc>, Int>()
+            val choiceNodeIndices = hashMapOf<ChoiceNode<S, LAbs, LConc>, Int>()
             val wrappedChoiceNodes = game.concreteChoiceNodes.map {
                 choiceNodeIndices[it] = i++
                 WrappedChoiceNode<S, LAbs, LConc>(it)
@@ -304,8 +303,8 @@ private fun <T> avgMap(map1: Map<T, Double>, map2: Map<T, Double>): HashMap<T, D
 
 private fun <S: State, LAbs, LConc> computeMECs(
     ERG: EdgeRelationGraph<S, LAbs, LConc>,
-    stateNodeIndices: Map<StateNode<S, LAbs>, Int>,
-    choiceNodeIndices: Map<ChoiceNode<S, LConc>, Int>
+    stateNodeIndices: Map<StateNode<S, LAbs, LConc>, Int>,
+    choiceNodeIndices: Map<ChoiceNode<S, LAbs, LConc>, Int>
 ): List<MECType<S, LAbs, LConc>>
 {
     var sccs: List<Set<Int>>

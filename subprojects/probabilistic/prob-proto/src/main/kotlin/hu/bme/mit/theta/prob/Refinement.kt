@@ -24,20 +24,20 @@ import hu.bme.mit.theta.core.utils.WpState
 import hu.bme.mit.theta.prob.AbstractionGame.*
 import java.util.*
 
-typealias StateNodeValues<S, LAbs> = Map<StateNode<S, LAbs>, Double>
-typealias ChoiceNodeValues<S, LConc> = Map<ChoiceNode<S, LConc>, Double>
+typealias StateNodeValues<S, LAbs, LConc> = Map<StateNode<S, LAbs, LConc>, Double>
+typealias ChoiceNodeValues<S, LAbs, LConc> = Map<ChoiceNode<S, LAbs, LConc>, Double>
 interface RefinableStateSelector {
     fun <S: State, LAbs, LConc> select(
         game: AbstractionGame<S, LAbs, LConc>,
-        VAmin: StateNodeValues<S, LAbs>,VAmax: StateNodeValues<S, LAbs>,
-        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
-    ): StateNode<S, LAbs>?
+        VAmin: StateNodeValues<S, LAbs, LConc>,VAmax: StateNodeValues<S, LAbs, LConc>,
+        VCmin: ChoiceNodeValues<S, LAbs, LConc>, VCmax: ChoiceNodeValues<S, LAbs, LConc>
+    ): StateNode<S, LAbs, LConc>?
 }
 
-fun <S: State, LConc> isRefinable(
-    s: StateNode<S, *>,
-    VCmax: ChoiceNodeValues<S, LConc>,
-    VCmin: ChoiceNodeValues<S, LConc>
+fun <S: State, LAbs, LConc> isRefinable(
+    s: StateNode<S, *, LConc>,
+    VCmax: ChoiceNodeValues<S, LAbs, LConc>,
+    VCmin: ChoiceNodeValues<S, LAbs, LConc>
 ): Boolean {
     val choices = s.outgoingEdges.map { it.end }
     if (choices.isEmpty()) return false
@@ -51,9 +51,9 @@ fun <S: State, LConc> isRefinable(
 object coarsestRefinableStateSelector: RefinableStateSelector {
     override fun <S : State, LAbs, LConc> select(
         game: AbstractionGame<S, LAbs, LConc>,
-        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
-        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
-    ): StateNode<S, LAbs>? {
+        VAmin: StateNodeValues<S, LAbs, LConc>, VAmax: StateNodeValues<S, LAbs, LConc>,
+        VCmin: ChoiceNodeValues<S, LAbs, LConc>, VCmax: ChoiceNodeValues<S, LAbs, LConc>
+    ): StateNode<S, LAbs, LConc>? {
         return game.stateNodes.filter{ isRefinable(it, VCmax, VCmin)}.maxBy { VAmax[it]!!-VAmin[it]!! } !!
     }
 }
@@ -61,9 +61,9 @@ object coarsestRefinableStateSelector: RefinableStateSelector {
 object randomizedCoarsestRefinableStateSelector: RefinableStateSelector {
     override fun <S : State, LAbs, LConc> select(
         game: AbstractionGame<S, LAbs, LConc>,
-        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
-        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
-    ): StateNode<S, LAbs>? {
+        VAmin: StateNodeValues<S, LAbs, LConc>, VAmax: StateNodeValues<S, LAbs, LConc>,
+        VCmin: ChoiceNodeValues<S, LAbs, LConc>, VCmax: ChoiceNodeValues<S, LAbs, LConc>
+    ): StateNode<S, LAbs, LConc>? {
         val refineables = game.stateNodes.filter { isRefinable(it, VCmax, VCmin) }
         val diffs = refineables.map { it to VAmax[it]!! - VAmin[it]!! }
         val max = diffs.maxBy { it.second }!!
@@ -76,11 +76,11 @@ object randomizedCoarsestRefinableStateSelector: RefinableStateSelector {
 object nearestRefinableStateSelector: RefinableStateSelector {
     override fun <S : State, LAbs, LConc> select(
         game: AbstractionGame<S, LAbs, LConc>,
-        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
-        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
-    ): StateNode<S, LAbs>? {
-        val q = ArrayDeque<StateNode<S, LAbs>>()
-        val visited = hashSetOf<StateNode<S, LAbs>>()
+        VAmin: StateNodeValues<S, LAbs, LConc>, VAmax: StateNodeValues<S, LAbs, LConc>,
+        VCmin: ChoiceNodeValues<S, LAbs, LConc>, VCmax: ChoiceNodeValues<S, LAbs, LConc>
+    ): StateNode<S, LAbs, LConc>? {
+        val q = ArrayDeque<StateNode<S, LAbs, LConc>>()
+        val visited = hashSetOf<StateNode<S, LAbs, LConc>>()
         q.addAll(game.initNodes)
         visited.addAll(game.initNodes)
         while (!q.isEmpty()) {
@@ -89,7 +89,7 @@ object nearestRefinableStateSelector: RefinableStateSelector {
                 .map { it.end }
                 .flatMap { it.outgoingEdges }
                 // TODO: get rid of this cast
-                .flatMap { it.end.pmf.keys.map { it as StateNode<S, LAbs> } }
+                .flatMap { it.end.pmf.keys.map { it as StateNode<S, LAbs, LConc> } }
                 .toSet()
                 .filterNot(visited::contains)
             val refinable = nexts.firstOrNull { isRefinable(it, VCmax, VCmin)}
@@ -105,10 +105,10 @@ object nearestRefinableStateSelector: RefinableStateSelector {
 interface PrecRefiner<P: Prec, S: State, LAbs, LConc> {
     fun refine(
         game: AbstractionGame<S, LAbs, LConc>,
-        stateToRefine: StateNode<S, LAbs>,
+        stateToRefine: StateNode<S, LAbs, LConc>,
         origPrecision: P,
-        VAmin: StateNodeValues<S, LAbs>, VAmax: StateNodeValues<S, LAbs>,
-        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
+        VAmin: StateNodeValues<S, LAbs, LConc>, VAmax: StateNodeValues<S, LAbs, LConc>,
+        VCmin: ChoiceNodeValues<S, LAbs, LConc>, VCmax: ChoiceNodeValues<S, LAbs, LConc>
     ): P
 }
 
@@ -116,10 +116,10 @@ class GlobalCfaExplRefiner<LConc>: PrecRefiner<
         GlobalCfaPrec<ExplPrec>, CfaState<ExplState>, CfaAction, LConc> {
     override fun refine(
         game: AbstractionGame<CfaState<ExplState>, CfaAction, LConc>,
-        stateToRefine: StateNode<CfaState<ExplState>, CfaAction>,
+        stateToRefine: StateNode<CfaState<ExplState>, CfaAction, LConc>,
         origPrecision: GlobalCfaPrec<ExplPrec>,
-        VAmin: StateNodeValues<CfaState<ExplState>, CfaAction>, VAmax: StateNodeValues<CfaState<ExplState>, CfaAction>,
-        VCmin: ChoiceNodeValues<CfaState<ExplState>, LConc>, VCmax: ChoiceNodeValues<CfaState<ExplState>, LConc>
+        VAmin: StateNodeValues<CfaState<ExplState>, CfaAction, LConc>, VAmax: StateNodeValues<CfaState<ExplState>, CfaAction, LConc>,
+        VCmin: ChoiceNodeValues<CfaState<ExplState>, CfaAction, LConc>, VCmax: ChoiceNodeValues<CfaState<ExplState>, CfaAction, LConc>
     ): GlobalCfaPrec<ExplPrec> {
 
         val choices = stateToRefine.outgoingEdges
@@ -166,10 +166,10 @@ class GlobalCfaPredRefiner<S: ExprState, LConc>: PrecRefiner<
 
     override fun refine(
         game: AbstractionGame<S, CfaAction, LConc>,
-        stateToRefine: StateNode<S, CfaAction>,
+        stateToRefine: StateNode<S, CfaAction, LConc>,
         origPrecision: GlobalCfaPrec<PredPrec>,
-        VAmin: StateNodeValues<S, CfaAction>, VAmax: StateNodeValues<S, CfaAction>,
-        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>
+        VAmin: StateNodeValues<S, CfaAction, LConc>, VAmax: StateNodeValues<S, CfaAction, LConc>,
+        VCmin: ChoiceNodeValues<S, CfaAction, LConc>, VCmax: ChoiceNodeValues<S, CfaAction, LConc>
     ): GlobalCfaPrec<PredPrec> {
 
         require(stateToRefine.outgoingEdges.isNotEmpty())
@@ -224,10 +224,10 @@ class LocalCfaPredRefiner<S: ExprState, LConc>(
 ): PrecRefiner<LocalCfaPrec<PredPrec>, S, CfaAction, LConc> {
     override fun refine(
         game: AbstractionGame<S, CfaAction, LConc>,
-        stateToRefine: StateNode<S, CfaAction>,
+        stateToRefine: StateNode<S, CfaAction, LConc>,
         origPrecision: LocalCfaPrec<PredPrec>,
-        VAmin: StateNodeValues<S, CfaAction>, VAmax: StateNodeValues<S, CfaAction>,
-        VCmin: ChoiceNodeValues<S, LConc>, VCmax: ChoiceNodeValues<S, LConc>,
+        VAmin: StateNodeValues<S, CfaAction, LConc>, VAmax: StateNodeValues<S, CfaAction, LConc>,
+        VCmin: ChoiceNodeValues<S, CfaAction, LConc>, VCmax: ChoiceNodeValues<S, CfaAction, LConc>,
     ): LocalCfaPrec<PredPrec> {
         val choices = stateToRefine.outgoingEdges
         val max = choices.mapNotNull{VCmax[it.end]}.max()!!
@@ -263,7 +263,7 @@ class LocalCfaPredRefiner<S: ExprState, LConc>(
 
         val newPrec = predicatePropagator.propagate(
             game as AbstractionGame<CfaState<PredState>, CfaAction, LConc>,
-            stateToRefine as StateNode<CfaState<PredState>, CfaAction>,
+            stateToRefine as StateNode<CfaState<PredState>, CfaAction, LConc>,
             origPrecision,
             wpPreds.toList()
         )
@@ -275,7 +275,7 @@ class LocalCfaPredRefiner<S: ExprState, LConc>(
 interface PredicatePropagator {
     fun <LAbs: StmtAction, LConc> propagate(
         game: AbstractionGame<CfaState<PredState>, LAbs, LConc>,
-        refinedState: StateNode<CfaState<PredState>, LAbs>,
+        refinedState: StateNode<CfaState<PredState>, LAbs, LConc>,
         origPrecision: LocalCfaPrec<PredPrec>,
         newPredicates: List<Expr<BoolType>>
     ): LocalCfaPrec<PredPrec>
@@ -284,7 +284,7 @@ interface PredicatePropagator {
 object nonPropagatingPropagator: PredicatePropagator {
     override fun <LAbs : StmtAction, LConc> propagate(
         game: AbstractionGame<CfaState<PredState>, LAbs, LConc>,
-        refinedState: StateNode<CfaState<PredState>, LAbs>,
+        refinedState: StateNode<CfaState<PredState>, LAbs, LConc>,
         origPrecision: LocalCfaPrec<PredPrec>,
         newPredicates: List<Expr<BoolType>>
     ): LocalCfaPrec<PredPrec> {
@@ -298,7 +298,7 @@ object nonPropagatingPropagator: PredicatePropagator {
 object gameTracePropagator: PredicatePropagator {
     override fun <LAbs : StmtAction, LConc> propagate(
         game: AbstractionGame<CfaState<PredState>, LAbs, LConc>,
-        refinedState: StateNode<CfaState<PredState>, LAbs>,
+        refinedState: StateNode<CfaState<PredState>, LAbs, LConc>,
         origPrecision: LocalCfaPrec<PredPrec>,
         newPredicates: List<Expr<BoolType>>
     ): LocalCfaPrec<PredPrec> {
@@ -310,7 +310,7 @@ object gameTracePropagator: PredicatePropagator {
 
         var newPrec = origPrecision
         fun refinePrec(
-            stateNode: StateNode<CfaState<PredState>, LAbs>,
+            stateNode: StateNode<CfaState<PredState>, LAbs, LConc>,
             newPreds: Collection<Expr<BoolType>>
         ) {
             val loc = stateNode.state.loc
@@ -359,7 +359,7 @@ object gameTracePropagator: PredicatePropagator {
 object cfaEdgePropagator: PredicatePropagator {
     override fun <LAbs : StmtAction, LConc> propagate(
         game: AbstractionGame<CfaState<PredState>, LAbs, LConc>,
-        refinedState: StateNode<CfaState<PredState>, LAbs>,
+        refinedState: StateNode<CfaState<PredState>, LAbs, LConc>,
         origPrecision: LocalCfaPrec<PredPrec>,
         newPredicates: List<Expr<BoolType>>
     ): LocalCfaPrec<PredPrec> {

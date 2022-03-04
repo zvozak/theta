@@ -14,10 +14,10 @@ import hu.bme.mit.theta.prob.EnumeratedDistribution.Companion.dirac
 import hu.bme.mit.theta.prob.TransferFunctions.CfaGroupedTransferFunction
 
 fun <S: State, LAbs, LConc> strategyFromValues(
-    VA: Map<StateNode<S, LAbs>, Double>,
-    VC: Map<ChoiceNode<S, LConc>, Double>,
+    VA: Map<StateNode<S, LAbs, LConc>, Double>,
+    VC: Map<ChoiceNode<S, LAbs, LConc>, Double>,
     playerAGoal: OptimType
-): Map<StateNode<S, LAbs>, ChoiceNode<S, *>?> {
+): Map<StateNode<S, LAbs, LConc>, ChoiceNode<S, LAbs, LConc>?> {
     val strat = VA.keys.map {
         val values = it.outgoingEdges.map {
             val node = it.end
@@ -43,7 +43,7 @@ data class PCFACheckResult(
     val lastMax: Double
 )
 
-typealias PcfaStateNode<S> = StateNode<CfaState<S>, CfaAction>
+typealias PcfaStateNode<S> = StateNode<CfaState<S>, CfaAction, Unit>
 fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkThresholdProperty(
     transFunc: CfaGroupedTransferFunction<S, SubP>,
     lts: CfaSbeLts, // LBE not supported yet!
@@ -141,45 +141,6 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> computeProb(
     }
 }
 
-private fun <S : ExprState> analyzeGame(
-    game: AbstractionGame<CfaState<S>, CfaAction, Unit>,
-    errorLoc: CFA.Loc,
-    finalLoc: CFA.Loc,
-    nonDetGoal: OptimType
-): Pair<AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>, AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>> {
-    val LAinit = hashMapOf(*game.stateNodes.map {
-        it to if (it.state.loc == errorLoc) 1.0 else 0.0
-    }.toTypedArray())
-    val LCinit = hashMapOf(*game.concreteChoiceNodes.map { it to 0.0 }.toTypedArray())
-    val UAinit = hashMapOf(*game.stateNodes.map {
-        it to if (it.state.loc == finalLoc) 0.0 else 1.0
-    }.toTypedArray())
-    val UCinit = hashMapOf(*game.concreteChoiceNodes.map { it to 1.0 }.toTypedArray())
-
-    val convergenceThreshold = 1e-6
-
-    val minCheckResult = BVI(
-        game,
-        OptimType.MIN, nonDetGoal,
-        convergenceThreshold,
-        LAinit, LCinit,
-        UAinit, UCinit,
-        game.initNodes.toList(),
-        collapseMecs = true
-    )
-
-    val maxCheckResult = BVI(
-        game,
-        OptimType.MAX, nonDetGoal,
-        convergenceThreshold,
-        LAinit, LCinit,
-        UAinit, UCinit,
-        game.initNodes.toList(),
-        collapseMecs = true
-    )
-    return Pair(minCheckResult, maxCheckResult)
-}
-
 fun <P : Prec, S : ExprState> computeGameAbstraction(
     init: CfaInitFunc<S, P>,
     lts: CfaSbeLts,
@@ -221,10 +182,10 @@ fun <P : Prec, S : ExprState> computeGameAbstraction(
                     // It might be better to label the returned states with the stmt that led to it instead of
                     // relying on the list orders
                     require(nextStateSet.size == substmts.size)
-                    val nextStatePMF = hashMapOf<StateNode<CfaState<S>, *>, Double>()
-                    val metadata = hashMapOf<StateNode<CfaState<S>, *>, MutableList<Stmt>>()
+                    val nextStatePMF = hashMapOf<StateNode<CfaState<S>, CfaAction, Unit>, Double>()
+                    val metadata = hashMapOf<StateNode<CfaState<S>, CfaAction, Unit>, MutableList<Stmt>>()
                     for (idx in substmts.indices) {
-                        val nextStateNode = getOrCreateNode(nextStateSet[idx]) as StateNode<CfaState<S>, *>
+                        val nextStateNode = getOrCreateNode(nextStateSet[idx])
                         metadata.getOrPut(nextStateNode) { arrayListOf() }.add(substmts[idx])
                         nextStatePMF[nextStateNode] =
                             (nextStatePMF[nextStateNode] ?: 0.0) + (stmt.distr.pmf[substmts[idx]] ?: 0.0)
@@ -232,8 +193,6 @@ fun <P : Prec, S : ExprState> computeGameAbstraction(
 
                     val nextStateDistr = EnumeratedDistribution(nextStatePMF, metadata)
 
-//                    val choiceNode = game.createConcreteChoiceNode()
-//                    game.connect(choiceNode, nextStateDistr, Unit)
                     val choiceNode = game.getOrCreateNodeWithChoices(setOf(nextStateDistr to Unit))
                     game.connect(node, choiceNode, action)
 
@@ -242,15 +201,10 @@ fun <P : Prec, S : ExprState> computeGameAbstraction(
             } else {
                 for (nextStateSet in nextStates) {
                     val choices = nextStateSet.map { nextState ->
-                        // TODO: get rid of that cast
-                        dirac(getOrCreateNode(nextState) as StateNode<CfaState<S>, *>, mutableListOf(stmt)) to Unit
+                        dirac(getOrCreateNode(nextState), mutableListOf(stmt)) to Unit
                     }.toSet()
                     val choiceNode = game.getOrCreateNodeWithChoices(choices)
-//                    val choiceNode = game.createConcreteChoiceNode()
                     game.connect(node, choiceNode, action)
-//                    for (nextState in nextStateSet) {
-//                        game.connect(choiceNode, dirac(getOrCreateNode(nextState), arrayListOf(stmt)), Unit)
-//                    }
                 }
             }
         }

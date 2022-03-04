@@ -25,6 +25,17 @@ class OTFMDPAbstractionTests {
         val v2 = int("v2")
         val v3 = int("v3")
 
+//        val model = CFA {
+//            val start = init(loc("Start"))
+//            val p = seq( start,
+//                v1 assign 0,
+//                v2 assign 0
+//            )
+//            val a = loc("A")
+//            val b = loc("B")
+//            branch(p, a, b, v2 leq v1)
+//        }
+
         val model = CFA {
             val p = seq(
                 v1 assign 1,
