@@ -1,8 +1,6 @@
 package hu.bme.mit.theta.prob
 
-import hu.bme.mit.theta.analysis.Action
 import hu.bme.mit.theta.analysis.Prec
-import hu.bme.mit.theta.analysis.State
 import hu.bme.mit.theta.analysis.expl.ExplInitFunc
 import hu.bme.mit.theta.analysis.expl.ExplPrec
 import hu.bme.mit.theta.analysis.expl.ExplState
@@ -20,11 +18,10 @@ import hu.bme.mit.theta.cfa.analysis.config.CfaConfigBuilder
 import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
-import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
-import hu.bme.mit.theta.prob.TransferFunctions.CfaGroupedTransferFunction
-import hu.bme.mit.theta.prob.TransferFunctions.ExplGroupedTransferFunction
-import hu.bme.mit.theta.prob.TransferFunctions.PredGroupedTransferFunction
+import hu.bme.mit.theta.prob.transfuns.CfaGroupedTransFunc
+import hu.bme.mit.theta.prob.transfuns.ExplStmtGroupedTransFunc
+import hu.bme.mit.theta.prob.transfuns.PredGroupedTransFunc
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
 import java.lang.UnsupportedOperationException
 
@@ -57,11 +54,13 @@ data class PCFAConfig(
 private typealias CfaPrecRefiner<S, P> = PrecRefiner<P, CfaState<S>, CfaAction, Unit>
 
 fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
+    GraphDB.logDB = GraphDB("bolt://localhost:7687", "neo4j", "Theta")
+
     val solver = Z3SolverFactory.getInstance().createSolver()
     val lts = CfaSbeLts.getInstance()
 
     fun <S: ExprState,  SubP : Prec, P : CfaPrec<SubP>> check(
-        transferFunction: CfaGroupedTransferFunction<S, SubP>,
+        transferFunction: CfaGroupedTransFunc<S, SubP>,
         initFunc: CfaInitFunc<S, SubP>,
         initP: P, precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>
     ) = if (cfg.exact) {
@@ -81,8 +80,8 @@ fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
 
     when (cfg.domain) {
         CfaConfigBuilder.Domain.EXPL -> {
-            val subTransFunc = ExplGroupedTransferFunction(solver)
-            val transFunc = CfaGroupedTransferFunction(subTransFunc)
+            val subTransFunc = ExplStmtGroupedTransFunc(solver)
+            val transFunc = CfaGroupedTransFunc(subTransFunc)
             val subInitFunc = ExplInitFunc.create(solver, BoolExprs.True())
             val initFunc = CfaInitFunc.create(cfa.initLoc, subInitFunc)
             fun <P: CfaPrec<ExplPrec>> check(initP: P, precRefiner: CfaPrecRefiner<ExplState, P>) =
@@ -96,8 +95,8 @@ fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
         }
 
         CfaConfigBuilder.Domain.PRED_BOOL -> {
-            val subTransFunc = PredGroupedTransferFunction(solver)
-            val transFunc = CfaGroupedTransferFunction(subTransFunc)
+            val subTransFunc = PredGroupedTransFunc(solver)
+            val transFunc = CfaGroupedTransFunc(subTransFunc)
             val subInitFunc = PredInitFunc.create(
                 PredAbstractors.booleanSplitAbstractor(solver),
                 BoolExprs.True()

@@ -1,4 +1,4 @@
-package hu.bme.mit.theta.prob.TransferFunctions
+package hu.bme.mit.theta.prob.transfuns
 
 import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.analysis.pred.PredPrec
@@ -22,14 +22,13 @@ import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.*
 import hu.bme.mit.theta.core.utils.indexings.VarIndexing
 import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
-import hu.bme.mit.theta.prob.GroupedTransferFunction
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 
 fun Stmt.unfold(): StmtUnfoldResult =
     StmtUtils.toExpr(this, VarIndexingFactory.indexing(0))
 
-class PredGroupedTransferFunction(
+class PredGroupedTransFunc(
     val solver: Solver
 ): GroupedTransferFunction<PredState, StmtAction, PredPrec> {
 

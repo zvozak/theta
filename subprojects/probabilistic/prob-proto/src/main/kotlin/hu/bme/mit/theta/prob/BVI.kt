@@ -7,6 +7,7 @@ import hu.bme.mit.theta.prob.ERGNode.WrappedStateNode
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -70,10 +71,11 @@ fun <S : State, LAbs, LConc> BVI(
     UAinit: Map<StateNode<S, LAbs, LConc>, Double>,
     UCinit: Map<ChoiceNode<S, LAbs, LConc>, Double>,
     checkedStateNodes: List<StateNode<S, LAbs, LConc>>,
-    collapseMecs: Boolean = false // Uses contraction instead of deflation if the playerA and playerC goals coincide
+    collapseMecs: Boolean = false // Uses collapsing instead of deflation if the playerA and playerC goals coincide
 ): AbstractionGameCheckResult<S, LAbs, LConc> {
 
     val collapseMecs = collapseMecs && playerAGoal == playerCGoal
+    val converged = hashSetOf<StateNode<S, LAbs, LConc>>()
 
     fun precomputeMecs(): List<Pair<Set<StateNode<S, LAbs, LConc>>, Set<ChoiceNode<S, LAbs, LConc>>>> {
         val stateNodeIndices = hashMapOf<StateNode<S, LAbs, LConc>, Int>()
@@ -191,6 +193,7 @@ fun <S : State, LAbs, LConc> BVI(
 
         // Computing MSECs for deflation
         if (collapseMecs) {
+            // TODO: this doesn't seem right
             for (mec in fullMecs) {
                 val LOptim = playerAGoal.select(mec.first.map { LA[it]!! }+mec.second.map { LC[it]!! })
                 val UOptim = playerAGoal.select(mec.first.map { UA[it]!! }+mec.second.map { UC[it]!! })
@@ -282,7 +285,7 @@ fun <S : State, LAbs, LConc> BVI(
             }
         }
 
-        val errorOnCheckedNodes = checkedStateNodes.sumByDouble { Math.abs(UA[it]!! - LA[it]!!) }
+        val errorOnCheckedNodes = checkedStateNodes.sumByDouble { abs(UA[it]!! - LA[it]!!) }
         val largestStateError = game.stateNodes.map { UA[it]!!-LA[it]!! }.max() ?: 0.0
         val largestChoiceError = game.concreteChoiceNodes.map { UC[it]!!-LC[it]!! }.max() ?: 0.0
         val largestError = max(largestStateError, largestChoiceError)
@@ -412,3 +415,18 @@ private fun <S:State, LA, LC> computeSCCs(ERG: EdgeRelationGraph<S, LA, LC>
 
     return SCCs
 }
+
+// Debug code:
+// val (sg, am, cm) = game.toStochasticGame()
+//val (ssg, map) = simplifySnakes(sg)
+//val mapInv = map.inverseImage()
+//val amInv = am.inverse()
+//val cmInv = cm.inverse()
+//val l = sgValsFromAgVals(LA, LC, am, cm)
+//val u = sgValsFromAgVals(UA, UC, am, cm)
+//val sl = l.mapKeys { (k,_) -> map[k]!! }
+//val su = u.mapKeys { (k,_) -> map[k]!! }
+//val graph = ssg.visualizeWithValueIntervals(sl, su, { n->
+//    fullMecs.indexOfFirst { mec -> mapInv[n].any { amInv[it] in mec.first || cmInv[it] in mec.second } }
+//})
+//GraphvizWriter.getInstance().writeFile(graph, """E:\egyetem\dipterv\probabilistic-theta\debug_out\ssg.dot""")

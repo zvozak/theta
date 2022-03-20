@@ -16,7 +16,7 @@ fun <S: State, LAbs, LConc> AbstractionGame<S, LAbs, LConc>.toStochasticGame():
     val cNodeMap = hashMapOf<AbstractionGame.ChoiceNode<S, LAbs, LConc>,
             StochasticGame<S, Unit, LAbs, LConc>.CNode>()
     for (stateNode in stateNodes) {
-        aNodeMap[stateNode] = result.ANode(stateNode.state)
+        aNodeMap[stateNode] = result.ANode(stateNode.state, isInit = stateNode in this.initNodes)
     }
     for (choiceNode in concreteChoiceNodes) {
         cNodeMap[choiceNode] = result.CNode(Unit)
@@ -26,11 +26,27 @@ fun <S: State, LAbs, LConc> AbstractionGame<S, LAbs, LConc>.toStochasticGame():
         result.AEdge(edge.label, aNodeMap[edge.start]!!, hashMapOf(cNodeMap[edge.end]!! to 1.0))
     }
     for(edge in this.concreteChoiceEdges) {
-        val end = edge.end.pmf.entries.map { aNodeMap[it.key]!! to it.value }.toMap()
+        val end = edge.end.pmf.entries.associate {
+            aNodeMap[it.key]!! as StochasticGame<S, Unit, LAbs, LConc>.Node to it.value
+        }
         result.CEdge(edge.label, cNodeMap[edge.start]!!, end)
     }
 
     return GameConversionResult(result, aNodeMap, cNodeMap)
 }
 
-fun <K, V> Map<K,V>.inverse() = this.entries.map { it.value to it.key }.toMap()
+fun <K, V> Map<K,V>.inverse() = this.entries.associate { it.value to it.key }
+fun <K, V> Map<K, V>.inverseImage(): Map<V, List<K>> {
+    val res = this.values.toSet().map { it to arrayListOf<K>() }.toMap()
+    for (k in keys) {
+        res[this[k]]?.add(k)
+    }
+    return res
+}
+
+fun <S: State, C, LAbs, LConc> sgValsFromAgVals(
+    VA: StateNodeValues<S, LAbs, LConc>,
+    VC: ChoiceNodeValues<S, LAbs, LConc>,
+    aMap: Map<AbstractionGame.StateNode<S, LAbs, LConc>, StochasticGame<S, C, LAbs, LConc>.Node>,
+    cMap: Map<AbstractionGame.ChoiceNode<S, LAbs, LConc>, StochasticGame<S, C, LAbs, LConc>.Node>,
+) = (VA.entries.map { (k, v) -> aMap[k]!! to v } + VC.entries.map { (k, v) -> cMap[k]!! to v }).toMap()

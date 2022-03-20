@@ -15,10 +15,13 @@ import hu.bme.mit.theta.cfa.analysis.CfaState
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.decl.VarDecl
+import hu.bme.mit.theta.core.model.ImmutableValuation
+import hu.bme.mit.theta.core.model.Valuation
 import hu.bme.mit.theta.core.stmt.NonDetStmt
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
 import hu.bme.mit.theta.core.type.booltype.BoolType
+import hu.bme.mit.theta.core.utils.ExprSimplifier
 import hu.bme.mit.theta.core.utils.ExprUtils.collectVars
 import hu.bme.mit.theta.core.utils.WpState
 import hu.bme.mit.theta.prob.AbstractionGame.*
@@ -214,7 +217,9 @@ class GlobalCfaPredRefiner<S: ExprState, LConc>: PrecRefiner<
             collectVars(it, l)
             l.size>0
         }
-        val newSubPrec = origPrecision.prec.join(PredPrec.of(predsUsed))
+        val newSubPrec = origPrecision.prec.join(PredPrec.of(predsUsed.map {
+            ExprSimplifier.simplify(it, ImmutableValuation.empty())
+        }))
         return GlobalCfaPrec.create(newSubPrec)
     }
 }
@@ -290,7 +295,9 @@ object nonPropagatingPropagator: PredicatePropagator {
     ): LocalCfaPrec<PredPrec> {
         val loc = refinedState.state.loc
         val origLocalPrec = origPrecision.getPrec(loc)
-        val newLocalPrec = origLocalPrec.join(PredPrec.of(newPredicates))
+        val newLocalPrec = origLocalPrec.join(PredPrec.of(newPredicates.map {
+            ExprSimplifier.simplify(it, ImmutableValuation.empty())
+        }))
         return origPrecision.refine(loc, newLocalPrec)
     }
 }
@@ -315,7 +322,9 @@ object gameTracePropagator: PredicatePropagator {
         ) {
             val loc = stateNode.state.loc
             val origLocalPrec = newPrec.getPrec(loc)
-            val newLocalPrec = origLocalPrec.join(PredPrec.of(newPreds))
+            val newLocalPrec = origLocalPrec.join(PredPrec.of(newPreds.map {
+                ExprSimplifier.simplify(it, ImmutableValuation.empty())
+            }))
             newPrec = newPrec.refine(loc, newLocalPrec)
         }
         val addedPreds = newPredicates.filter {
@@ -376,7 +385,9 @@ object cfaEdgePropagator: PredicatePropagator {
             newPreds: List<Expr<BoolType>>
         ) {
             val origLocalPrec = newPrec.getPrec(loc)
-            val newLocalPrec = origLocalPrec.join(PredPrec.of(newPreds))
+            val newLocalPrec = origLocalPrec.join(PredPrec.of(newPreds.map {
+                ExprSimplifier.simplify(it, ImmutableValuation.empty())
+            }))
             addedPreds[loc] = newPreds
             newPrec = newPrec.refine(loc, newLocalPrec)
         }

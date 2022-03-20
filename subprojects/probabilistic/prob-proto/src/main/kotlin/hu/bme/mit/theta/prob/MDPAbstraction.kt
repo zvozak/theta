@@ -11,7 +11,7 @@ import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.prob.AbstractionGame.ChoiceNode
 import hu.bme.mit.theta.prob.AbstractionGame.StateNode
 import hu.bme.mit.theta.prob.EnumeratedDistribution.Companion.dirac
-import hu.bme.mit.theta.prob.TransferFunctions.CfaGroupedTransferFunction
+import hu.bme.mit.theta.prob.transfuns.CfaGroupedTransFunc
 
 fun <S: State, LAbs, LConc> strategyFromValues(
     VA: Map<StateNode<S, LAbs, LConc>, Double>,
@@ -45,7 +45,7 @@ data class PCFACheckResult(
 
 typealias PcfaStateNode<S> = StateNode<CfaState<S>, CfaAction, Unit>
 fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkThresholdProperty(
-    transFunc: CfaGroupedTransferFunction<S, SubP>,
+    transFunc: CfaGroupedTransFunc<S, SubP>,
     lts: CfaSbeLts, // LBE not supported yet!
     init: CfaInitFunc<S, SubP>,
     initialPrec: P,
@@ -96,7 +96,7 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkThresholdProperty(
 }
 
 fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> computeProb(
-    transFunc: CfaGroupedTransferFunction<S, SubP>,
+    transFunc: CfaGroupedTransFunc<S, SubP>,
     lts: CfaSbeLts, // LBE not supported yet!
     init: CfaInitFunc<S, SubP>,
     initialPrec: P,
@@ -144,7 +144,7 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> computeProb(
 fun <P : Prec, S : ExprState> computeGameAbstraction(
     init: CfaInitFunc<S, P>,
     lts: CfaSbeLts,
-    transFunc: CfaGroupedTransferFunction<S, P>,
+    transFunc: CfaGroupedTransFunc<S, P>,
     currPrec: CfaPrec<P>
 ): AbstractionGame<CfaState<S>, CfaAction, Unit> {
     val sInit = init.getInitStates(currPrec).toSet()

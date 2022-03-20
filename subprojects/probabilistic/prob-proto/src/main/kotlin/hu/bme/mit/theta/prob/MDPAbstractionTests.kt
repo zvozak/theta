@@ -10,9 +10,9 @@ import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
-import hu.bme.mit.theta.prob.TransferFunctions.CfaGroupedTransferFunction
-import hu.bme.mit.theta.prob.TransferFunctions.ExplGroupedTransferFunction
-import hu.bme.mit.theta.prob.TransferFunctions.PredGroupedTransferFunction
+import hu.bme.mit.theta.prob.transfuns.CfaGroupedTransFunc
+import hu.bme.mit.theta.prob.transfuns.ExplStmtGroupedTransFunc
+import hu.bme.mit.theta.prob.transfuns.PredGroupedTransFunc
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
 
 fun main() {
@@ -78,8 +78,8 @@ class OTFMDPAbstractionTests {
         val initFunc = CfaInitFunc.create(model.initLoc, subInitFunc)
 
 
-        val subTransFunc = PredGroupedTransferFunction(solver)
-        val transFunc = CfaGroupedTransferFunction(subTransFunc)
+        val subTransFunc = PredGroupedTransFunc(solver)
+        val transFunc = CfaGroupedTransFunc(subTransFunc)
         val lts = CfaSbeLts.getInstance()
         val initPrec = GlobalCfaPrec.create(PredPrec.of())
 
@@ -89,8 +89,8 @@ class OTFMDPAbstractionTests {
 
         val explSubInitFunc = ExplInitFunc.create(solver, BoolExprs.True())
         val explInitFunc = CfaInitFunc.create(model.initLoc, explSubInitFunc)
-        val explSubTransFunc = ExplGroupedTransferFunction(solver)
-        val explTransFunc = CfaGroupedTransferFunction(explSubTransFunc)
+        val explSubTransFunc = ExplStmtGroupedTransFunc(solver)
+        val explTransFunc = CfaGroupedTransFunc(explSubTransFunc)
         val explInitPrec = GlobalCfaPrec.create(ExplPrec.empty())
 
 
