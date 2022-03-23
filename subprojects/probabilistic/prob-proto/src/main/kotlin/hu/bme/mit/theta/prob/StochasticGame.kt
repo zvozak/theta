@@ -407,6 +407,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
         msecOptimalityThreshold: Double = 1e-10,
         checkOnlyInits: Boolean = false
     ): Map<Node, Double> {
+        if(goal(Player.C) == goal(Player.A)) return BVI(goal(Player.A), UInit, LInit, convThreshold, checkOnlyInits)
         this.addSelfLoops()
         var U = UInit
         var L = LInit

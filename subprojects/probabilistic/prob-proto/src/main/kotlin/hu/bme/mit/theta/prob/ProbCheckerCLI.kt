@@ -19,9 +19,11 @@ import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
-import hu.bme.mit.theta.prob.transfuns.CfaGroupedTransFunc
-import hu.bme.mit.theta.prob.transfuns.ExplStmtGroupedTransFunc
-import hu.bme.mit.theta.prob.transfuns.PredGroupedTransFunc
+import hu.bme.mit.theta.prob.refinement.*
+import hu.bme.mit.theta.prob.transfunc.BasicCartesianGroupedTransFunc
+import hu.bme.mit.theta.prob.transfunc.CfaGroupedTransFunc
+import hu.bme.mit.theta.prob.transfunc.ExplStmtGroupedTransFunc
+import hu.bme.mit.theta.prob.transfunc.PredGroupedTransFunc
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
 import java.lang.UnsupportedOperationException
 
@@ -48,7 +50,8 @@ data class PCFAConfig(
     val optimType: OptimType,
     val lbe: Boolean,
     val exact: Boolean,
-    val tolerance: Double
+    val tolerance: Double,
+    val limit: Int
 )
 
 private typealias CfaPrecRefiner<S, P> = PrecRefiner<P, CfaState<S>, CfaAction, Unit>
@@ -80,7 +83,7 @@ fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
 
     when (cfg.domain) {
         CfaConfigBuilder.Domain.EXPL -> {
-            val subTransFunc = ExplStmtGroupedTransFunc(solver)
+            val subTransFunc = ExplStmtGroupedTransFunc(solver, cfg.limit)
             val transFunc = CfaGroupedTransFunc(subTransFunc)
             val subInitFunc = ExplInitFunc.create(solver, BoolExprs.True())
             val initFunc = CfaInitFunc.create(cfa.initLoc, subInitFunc)
@@ -94,8 +97,10 @@ fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
             }
         }
 
-        CfaConfigBuilder.Domain.PRED_BOOL -> {
-            val subTransFunc = PredGroupedTransFunc(solver)
+        CfaConfigBuilder.Domain.PRED_BOOL, CfaConfigBuilder.Domain.PRED_CART  -> {
+            val subTransFunc =
+                if(cfg.domain == CfaConfigBuilder.Domain.PRED_BOOL) PredGroupedTransFunc(solver)
+                else BasicCartesianGroupedTransFunc(solver)
             val transFunc = CfaGroupedTransFunc(subTransFunc)
             val subInitFunc = PredInitFunc.create(
                 PredAbstractors.booleanSplitAbstractor(solver),
@@ -112,7 +117,6 @@ fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
             }
         }
 
-        CfaConfigBuilder.Domain.PRED_CART -> throw UnsupportedOperationException()
         CfaConfigBuilder.Domain.PRED_SPLIT -> throw UnsupportedOperationException()
     }
 }

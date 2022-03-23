@@ -57,70 +57,6 @@ private typealias MergedStochasticGameCNode<SAbs, SConc, LAbs, LConc> =
                 List<StochasticGame<SAbs, SConc, LAbs, LConc>.Edge>,
                 >.CNode
 
-/**
- * Replaces all snake patterns ->()->()->...->()->(head) with a single edge,
- * merging the nodes of the snake into the "head"
- */
-fun <SAbs, SConc, LAbs, LConc> simplifySnakes(game: StochasticGame<SAbs, SConc, LAbs, LConc>): Pair<
-        MergedStochasticGame<SAbs, SConc, LAbs, LConc>,
-        HashMap<
-                StochasticGame<SAbs, SConc, LAbs, LConc>.Node,
-                MergedStochasticGameNode<SAbs, SConc, LAbs, LConc>>
-        > {
-    val result = MergedStochasticGame<SAbs, SConc, LAbs, LConc>()
-    val nodeMap = hashMapOf<
-            StochasticGame<SAbs, SConc, LAbs, LConc>.Node,
-            MergedStochasticGameNode<SAbs, SConc, LAbs, LConc>
-            >()
-
-
-    fun isSimplifiable(node: StochasticGame<SAbs, SConc, LAbs, LConc>.Node): Boolean {
-        return node.inEdges.size == 1 && node.outEdges.size == 1 &&
-                node.outEdges.first().end.keys.size == 1 &&
-                node.outEdges.first().end.keys.first().inEdges.size == 1
-    }
-    val nonSimplifiable = game.allNodes.filterNot(::isSimplifiable)
-
-    // Creating nodes of the new game
-
-    val q = ArrayDeque<StochasticGame<SAbs, SConc, LAbs, LConc>.Node>(nonSimplifiable.size)
-    for (node in nonSimplifiable) {
-        val res = when(node.owner) {
-            StochasticGame.Companion.Player.A -> result.ANode(arrayListOf(node))
-            StochasticGame.Companion.Player.C -> result.CNode(arrayListOf(node))
-        }
-        nodeMap[node] = res
-        q.add(node)
-    }
-
-    while (!q.isEmpty()) {
-        val curr = q.poll()
-        if(curr.inEdges.size==1 && isSimplifiable(curr.inEdges.first().start)) {
-            val nodeToMerge = curr.inEdges.first().start
-            val merged = nodeMap[curr]!!
-            nodeMap[nodeToMerge] = merged
-            when(merged) {
-                is StochasticGame.ANode -> (merged.s as ArrayList).add(0, nodeToMerge)
-                is StochasticGame.CNode -> (merged.s as ArrayList).add(0, nodeToMerge)
-            }
-            q.add(nodeToMerge)
-        }
-    }
-
-    // Filling in the edges
-    for (edge in game.allEdges) {
-        val start = nodeMap[edge.start]!!
-        val end = edge.end.mapKeys { nodeMap[it.key]!! }
-        if(end.size == 1 && start == end.keys.first()) continue
-        // TODO: collect the original labels
-        when(start) {
-            is StochasticGame.ANode -> {result.AEdge(listOf(edge), start, end)}
-            is StochasticGame.CNode -> {result.CEdge(listOf(edge), start, end)}
-        }
-    }
-
-    return Pair(result, nodeMap)
-}
 
 fun <SAbs, SConc, LAbs, LConc> toMergedGame(game: StochasticGame<SAbs, SConc, LAbs, LConc>): Pair<
         MergedStochasticGame<SAbs, SConc, LAbs, LConc>,
@@ -142,6 +78,10 @@ fun <SAbs, SConc, LAbs, LConc> toMergedGame(game: StochasticGame<SAbs, SConc, LA
     return Pair(res, nodeMap)
 }
 
+/**
+ * Replaces all snake patterns ->()->()->...->()->(head) with a single edge,
+ * merging the nodes of the snake into the "head"
+ */
 object simplifySnakesPass {
     fun <SAbs, SConc, LAbs, LConc> apply(game: MergedStochasticGame<SAbs, SConc, LAbs, LConc>): Pair<
             MergedStochasticGame<SAbs, SConc, LAbs, LConc>,
@@ -283,55 +223,15 @@ object iterativeSimplificationPass {
         var res = game
         var map = game.allNodes.associateWith { it } // Identity map
         do {
-            val resSize = game.allNodes.size
+            val resSize = res.allNodes.size
             val (next, nextMap) = simplifySnakesPass.apply(res)
             map = map.mapValues { nextMap[it.value]!! }
             val (next2, nextMap2) = simplifySameOutsPass.apply(next)
             map = map.mapValues { nextMap2[it.value]!! }
             res = next2
-        } while (resSize == res.allNodes.size)
+        } while (resSize != res.allNodes.size)
         return Pair(res, map)
     }
-}
-
-fun <SAbs, SConc, LAbs, LConc> simplifySameOuts(game: StochasticGame<SAbs, SConc, LAbs, LConc>): Pair<
-        MergedStochasticGame<SAbs, SConc, LAbs, LConc>,
-        HashMap<
-                StochasticGame<SAbs, SConc, LAbs, LConc>.Node,
-                MergedStochasticGameNode<SAbs, SConc, LAbs, LConc>>
-        > {
-    val result = MergedStochasticGame<SAbs, SConc, LAbs, LConc>()
-    val nodeMap = hashMapOf<
-            StochasticGame<SAbs, SConc, LAbs, LConc>.Node,
-            MergedStochasticGameNode<SAbs, SConc, LAbs, LConc>
-            >()
-
-    val grouping = game.allNodes.groupBy { it.owner to it.outEdges.map { it.end }.toSet() }
-    for ((key, nodes) in grouping) {
-        val (owner, _) = key
-        val resultNode = when(owner) {
-            StochasticGame.Companion.Player.A -> result.ANode(nodes, isInit = nodes.any{it.isInit})
-            StochasticGame.Companion.Player.C -> result.CNode(nodes, isInit = nodes.any{it.isInit})
-        }
-        nodes.forEach { nodeMap[it] = resultNode }
-    }
-
-    for ((key, nodes) in grouping) {
-        val (_, ends) = key
-        val resStart = nodeMap[nodes.first()]!!
-        for (end in ends) {
-            val resEnd = end.entries.map { (k,v) -> nodeMap[k]!! to v }.groupingBy { it.first }.fold(0.0) {
-                    acc, elem -> acc + elem.second
-            }
-            if(resStart.outEdges.any {it.end == resEnd}) continue
-            when(resStart) {
-                is StochasticGame.ANode -> result.AEdge(listOf(), resStart, resEnd)
-                is StochasticGame.CNode -> result.CEdge(listOf(), resStart, resEnd)
-            }
-        }
-    }
-
-    return Pair(result, nodeMap)
 }
 
 /**

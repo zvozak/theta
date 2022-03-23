@@ -10,9 +10,11 @@ import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
-import hu.bme.mit.theta.prob.transfuns.CfaGroupedTransFunc
-import hu.bme.mit.theta.prob.transfuns.ExplStmtGroupedTransFunc
-import hu.bme.mit.theta.prob.transfuns.PredGroupedTransFunc
+import hu.bme.mit.theta.prob.refinement.GlobalCfaExplRefiner
+import hu.bme.mit.theta.prob.refinement.nearestRefinableStateSelector
+import hu.bme.mit.theta.prob.transfunc.CfaGroupedTransFunc
+import hu.bme.mit.theta.prob.transfunc.ExplStmtGroupedTransFunc
+import hu.bme.mit.theta.prob.transfunc.PredGroupedTransFunc
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
 
 fun main() {

@@ -7,11 +7,14 @@ import hu.bme.mit.theta.analysis.waitlist.FifoWaitlist
 import hu.bme.mit.theta.cfa.CFA
 import hu.bme.mit.theta.cfa.analysis.*
 import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
+import hu.bme.mit.theta.core.stmt.SequenceStmt
 import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.prob.AbstractionGame.ChoiceNode
 import hu.bme.mit.theta.prob.AbstractionGame.StateNode
 import hu.bme.mit.theta.prob.EnumeratedDistribution.Companion.dirac
-import hu.bme.mit.theta.prob.transfuns.CfaGroupedTransFunc
+import hu.bme.mit.theta.prob.refinement.PrecRefiner
+import hu.bme.mit.theta.prob.refinement.RefinableStateSelector
+import hu.bme.mit.theta.prob.transfunc.CfaGroupedTransFunc
 
 fun <S: State, LAbs, LConc> strategyFromValues(
     VA: Map<StateNode<S, LAbs, LConc>, Double>,
@@ -52,18 +55,28 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkThresholdProperty(
     errorLoc: CFA.Loc, finalLoc: CFA.Loc,
     nonDetGoal: OptimType, propertyThreshold: Double, thresholdType: ThresholdType,
     precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>,
-    refinableStateSelector: RefinableStateSelector
+    refinableStateSelector: RefinableStateSelector,
+    useBVI: Boolean = false
 ): PCFACheckResult {
     var currPrec = initialPrec
     var iters = 0
+    var prevSize = 0
 
     while (true) {
         iters++
         val game = computeGameAbstraction(init, lts, transFunc, currPrec)
+        println("Iter $iters: ")
+        println("    $currPrec")
+        println("    Abstraction size: ${game.stateNodes.size}")
+        if(prevSize == game.stateNodes.size)
+            throw java.lang.RuntimeException("Abstraction refinement stuck :-(, " +
+                    "use a configuration with more precise post operator or better refinement")
+        prevSize = game.stateNodes.size
+
 
         // Computing the approximation for the property under check for the abstraction
 
-        val (minCheckResult, maxCheckResult) = analyzeGame(game, errorLoc, finalLoc, nonDetGoal)
+        val (minCheckResult, maxCheckResult) = analyzeGame(game, errorLoc, finalLoc, nonDetGoal, useBVI)
 
         val max = nonDetGoal.select(game.initNodes.map { maxCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
         val min = nonDetGoal.select(game.initNodes.map { minCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
@@ -71,8 +84,6 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> checkThresholdProperty(
         val maxSatisfies = thresholdType.check(propertyThreshold, max)
         val minSatisfies = thresholdType.check(propertyThreshold, min)
 
-        println("Iter $iters: ")
-        println("    $currPrec")
         println("    [$min, $max]")
 
         if (maxSatisfies && minSatisfies) {
@@ -103,7 +114,8 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> computeProb(
     errorLoc: CFA.Loc, finalLoc: CFA.Loc,
     nonDetGoal: OptimType, tolerance: Double,
     precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>,
-    refinableStateSelector: RefinableStateSelector
+    refinableStateSelector: RefinableStateSelector,
+    useBVI: Boolean = false
 ): PCFACheckResult {
     var currPrec = initialPrec
     var iters = 0
@@ -114,7 +126,7 @@ fun <S: ExprState, SubP: Prec, P: CfaPrec<SubP>> computeProb(
 
         // Computing the approximation for the property under check for the abstraction
 
-        val (minCheckResult, maxCheckResult) = analyzeGame(game, errorLoc, finalLoc, nonDetGoal)
+        val (minCheckResult, maxCheckResult) = analyzeGame(game, errorLoc, finalLoc, nonDetGoal, useBVI)
 
         val max = nonDetGoal.select(game.initNodes.map { maxCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
         val min = nonDetGoal.select(game.initNodes.map { minCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
@@ -173,8 +185,7 @@ fun <P : Prec, S : ExprState> computeGameAbstraction(
         val actions = lts.getEnabledActionsFor(s)
 
         for (action in actions) {
-            require(action.stmts.size == 1) // TODO: action-based LBE not supported yet
-            val stmt = action.stmts.first()
+            val stmt = if(action.stmts.size == 1) action.stmts.first() else SequenceStmt.of(action.stmts)
             val nextStates = transFunc.getSuccStates(s, action, currPrec)
             if (stmt is ProbStmt) {
                 val substmts = stmt.stmts
@@ -195,8 +206,6 @@ fun <P : Prec, S : ExprState> computeGameAbstraction(
 
                     val choiceNode = game.getOrCreateNodeWithChoices(setOf(nextStateDistr to Unit))
                     game.connect(node, choiceNode, action)
-
-                    // TODO: merge next state distributions if possible
                 }
             } else {
                 for (nextStateSet in nextStates) {

@@ -1,4 +1,4 @@
-package hu.bme.mit.theta.prob.transfuns
+package hu.bme.mit.theta.prob.transfunc
 
 import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.analysis.pred.PredPrec
@@ -6,8 +6,12 @@ import hu.bme.mit.theta.analysis.pred.PredState
 import hu.bme.mit.theta.core.decl.ConstDecl
 import hu.bme.mit.theta.core.decl.Decls
 import hu.bme.mit.theta.core.decl.VarDecl
+import hu.bme.mit.theta.core.stmt.HavocStmt
 import hu.bme.mit.theta.core.stmt.NonDetStmt
+import hu.bme.mit.theta.core.stmt.SequenceStmt
+import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.core.type.Expr
+import hu.bme.mit.theta.core.type.Type
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
 import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.ExprUtils
@@ -19,53 +23,30 @@ import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 import java.util.*
 
-class CartesianGroupedTransFunc(
-    val solver: Solver,
-    val computeNonDetExactly: Boolean = true
+class BasicCartesianGroupedTransFunc(
+    val solver: Solver
 ): GroupedTransferFunction<PredState, StmtAction, PredPrec> {
 
     private val actLits: ArrayList<ConstDecl<BoolType>> = arrayListOf()
     private val litPrefix = "__" + javaClass.simpleName + "_" + PredGroupedTransFunc.instanceCounter + "_"
 
     override fun getSuccStates(state: PredState, action: StmtAction, prec: PredPrec): List<List<PredState>> {
-        TODO("Not yet implemented")
-    }
-
-    private fun handleNonDetCartesian(stmt: NonDetStmt, state: PredState, prec: PredPrec): List<List<PredState>> {
-        val subStmts = stmt.stmts
-        var maxPrimes = 0
-        val nextIndexings = arrayListOf<VarIndexing>()
-        val subExprs = subStmts.mapIndexed { idx, subStmt ->
-            val unfoldResult = subStmt.unfold()
-            val preExpr = BoolExprs.And(unfoldResult.exprs)
-            val expr = offsetNonZeroPrimes(preExpr, maxPrimes)
-            val primes = PrimeCounter.countPrimes(expr)
-            nextIndexings.add(primes)
-            val vars = arrayListOf<VarDecl<*>>()
-            ExprUtils.collectVars(expr, vars)
-            maxPrimes = vars.map(primes::get).max() ?: 0
-            return@mapIndexed expr
-        }.toMutableList()
-        subExprs.add(state.toExpr())
-        val exprIndexing = VarIndexingFactory.indexing(0)
-
-        WithPushPop(solver).use { wp ->
-            solver.add(PathUtils.unfold(BoolExprs.And(subExprs), exprIndexing))
-            solver.check()
-            if (solver.status.isUnsat) {
-                return listOf()
+        val stmt = if(action.stmts.size == 1) action.stmts.first() else SequenceStmt.of(action.stmts)
+        return when(stmt) {
+            is NonDetStmt -> handleNonDet(stmt, state, prec)
+            is HavocStmt<*> -> {
+                if(isSimplificationApplicable(stmt, prec))
+                    handleHavocSimplified(stmt, state, prec)
+                else
+                    handleHavocGeneral(stmt, state, prec)
             }
-
-            for (pred in prec.preds) {
-                WithPushPop(solver).use { wp1 ->
-                    TODO()
-                    //val combinations = solver.add(
-                    //    PathUtils.unfold()
-                    //)
-                }
+            is SequenceStmt ->
+                if (stmt.stmts.any {it is HavocStmt<*> }) TODO()
+                else getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
+            else -> {
+                getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
             }
         }
-        TODO()
     }
 
     private fun generateActivationLiterals(n: Int) {
@@ -74,7 +55,7 @@ class CartesianGroupedTransFunc(
         }
     }
 
-    private fun handleNonDetExact(stmt: NonDetStmt, state: PredState, prec: PredPrec): List<List<PredState>> {
+    private fun handleNonDet(stmt: NonDetStmt, state: PredState, prec: PredPrec): List<List<PredState>> {
         val subStmts = stmt.stmts
 
         var maxPrimes = 0
@@ -143,10 +124,29 @@ class CartesianGroupedTransFunc(
         return res
     }
 
-    private fun getNonGroupedNextStates(state: PredState, action: StmtAction, prec: PredPrec): List<PredState> {
-        require(action.stmts.size == 1) {"Action-based LBE not supported - use SEQ stmt"}
+    private fun isSimplificationApplicable(stmt: HavocStmt<*>, prec: PredPrec): Boolean {
+        val havocVar = stmt.varDecl
+        return prec.preds.none {
+            val vars = arrayListOf<VarDecl<*>>()
+            ExprUtils.collectVars(it, vars)
+            return@none vars.any(havocVar::equals)
+        }
+    }
 
-        val unfoldResult = action.stmts.first().unfold()
+    private fun <T: Type> handleHavocSimplified(
+        stmt: HavocStmt<T>, state: PredState, prec: PredPrec
+    ): List<List<PredState>> {
+        return listOf(getNonGroupedNextStates(state, stmt, prec))
+    }
+
+    private fun <T: Type> handleHavocGeneral(
+        stmt: HavocStmt<T>, state: PredState, prec: PredPrec
+    ): List<List<PredState>> {
+        TODO("Not supported yet")
+    }
+
+    private fun getNonGroupedNextStates(state: PredState, stmt: Stmt, prec: PredPrec): List<PredState> {
+        val unfoldResult = stmt.unfold()
         val stmtExpr =
             if(unfoldResult.exprs.size == 1) unfoldResult.exprs.first()
             else BoolExprs.And(unfoldResult.exprs)
@@ -154,7 +154,7 @@ class CartesianGroupedTransFunc(
         val exprIndexing = VarIndexingFactory.indexing(0)
 
         val newStatePreds: MutableList<Expr<BoolType>> = ArrayList()
-        val precIndexing = action.nextIndexing()
+        val precIndexing = unfoldResult.indexing
 
         WithPushPop(solver).use { wp ->
             solver.add(PathUtils.unfold(expr, exprIndexing))

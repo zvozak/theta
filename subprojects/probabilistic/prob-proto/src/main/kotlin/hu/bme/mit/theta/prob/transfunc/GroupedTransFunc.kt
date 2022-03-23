@@ -1,4 +1,4 @@
-package hu.bme.mit.theta.prob.transfuns
+package hu.bme.mit.theta.prob.transfunc
 
 import hu.bme.mit.theta.analysis.Action
 import hu.bme.mit.theta.analysis.Prec

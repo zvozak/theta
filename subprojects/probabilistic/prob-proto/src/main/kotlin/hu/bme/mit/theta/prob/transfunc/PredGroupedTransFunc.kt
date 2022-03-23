@@ -1,4 +1,4 @@
-package hu.bme.mit.theta.prob.transfuns
+package hu.bme.mit.theta.prob.transfunc
 
 import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.analysis.pred.PredPrec
@@ -39,8 +39,7 @@ class PredGroupedTransFunc(
     init { instanceCounter++ }
 
     override fun getSuccStates(state: PredState, action: StmtAction, prec: PredPrec): List<List<PredState>> {
-        require(action.stmts.size == 1) // LBE not supported yet
-        val stmt = action.stmts.first()
+        val stmt = if(action.stmts.size == 1) action.stmts.first() else SequenceStmt.of(action.stmts)
         return when(stmt) {
             is NonDetStmt -> handleNonDet(stmt, state, prec)
             is HavocStmt<*> -> {

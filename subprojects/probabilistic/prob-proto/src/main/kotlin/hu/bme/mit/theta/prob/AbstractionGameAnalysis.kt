@@ -8,35 +8,17 @@ import hu.bme.mit.theta.prob.OptimType.MAX
 import hu.bme.mit.theta.prob.OptimType.MIN
 import hu.bme.mit.theta.prob.StochasticGame.Companion.Player.C
 
-enum class Player{
-    Abstraction, Concrete
-}
-
 fun <S : ExprState> analyzeGame(
     game: AbstractionGame<CfaState<S>, CfaAction, Unit>,
     errorLoc: CFA.Loc,
     finalLoc: CFA.Loc,
     nonDetGoal: OptimType,
-    useBVI: Boolean = false
+    useBVI: Boolean
 ): Pair<AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>, AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>> {
     val (stochGame, aNodeMap, cNodeMap) = game.toStochasticGame()
     val targets =
         game.stateNodes.filter { it.state.loc == errorLoc }.map(aNodeMap::get).filterNotNull().toSet()
     val almostSureTarget = stochGame.almostSure(C, targets)
-
-    val LAinit = hashMapOf(*game.stateNodes.map {
-        val isTarget =
-            it.state.loc == errorLoc || (nonDetGoal == MAX && almostSureTarget.contains(aNodeMap[it]!!))
-        it to if (isTarget) 1.0 else 0.0
-    }.toTypedArray())
-    val LCinit = hashMapOf(*game.concreteChoiceNodes.map {
-        it to if(cNodeMap[it]!! in almostSureTarget) 1.0 else 0.0
-    }.toTypedArray())
-
-    val UAinit = hashMapOf(*game.stateNodes.map {
-        it to if (it.state.loc == finalLoc) 0.0 else 1.0
-    }.toTypedArray())
-    val UCinit = hashMapOf(*game.concreteChoiceNodes.map { it to 1.0 }.toTypedArray())
 
     val convergenceThreshold = 1e-8
 
@@ -74,7 +56,7 @@ fun <S : ExprState> analyzeGame(
     val uinit2 = simplifiedGame.allNodes.associateWith { invMap[it]!!.map { uinit[invEmbedMap[it]]!! }.min()!!}
     val simplifiedCheck =
         if (useBVI) simplifiedGame.BVI(
-            MAX,
+            { if (it == C) nonDetGoal else MAX },
             uinit2,
             linit2,
             convergenceThreshold

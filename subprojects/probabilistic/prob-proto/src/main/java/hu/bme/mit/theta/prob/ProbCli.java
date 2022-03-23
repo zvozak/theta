@@ -110,6 +110,9 @@ public class ProbCli {
 	@Parameter(names = "--tolerance", description = "Tolerance of the \"exact\" computation")
 	double tolerance = 1e-7;
 
+	@Parameter(names = "--limit", description = "Enumerationl limit when the explicit domain is used. Use 0 for unlimited enumeration.")
+	int limit = 0;
+
 	//////////// CONFIGURATION OPTIONS END ////////////
 
 	private final Logger logger = new ConsoleLogger(logLevel);;
@@ -186,7 +189,7 @@ public class ProbCli {
 				handleCfa(cfa);
 				logger.write(Logger.Level.INFO, "Analysis done at " + sw.elapsed().toMillis() + "ms");
 			}
-		} catch (final Throwable ex) {
+		} catch (final IOException ex) {
 			ex.printStackTrace();
 			logger.write(Logger.Level.INFO, "Analysis exited unsuccessfully at " + sw.elapsed().toMillis() + "ms");
 		}
@@ -268,8 +271,15 @@ public class ProbCli {
 				optimType,
 				lbe,
 				exact,
-				tolerance
+				tolerance,
+				limit
 		);
+		System.err.flush();
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 		ProbCheckerCLIKt.handlePCFA(cfa, config);
 	}
 
