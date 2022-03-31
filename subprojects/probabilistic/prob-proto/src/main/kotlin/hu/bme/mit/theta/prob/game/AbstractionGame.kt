@@ -1,7 +1,8 @@
-package hu.bme.mit.theta.prob
+package hu.bme.mit.theta.prob.game
 
 import hu.bme.mit.theta.analysis.State
 import hu.bme.mit.theta.core.stmt.Stmt
+import hu.bme.mit.theta.prob.EnumeratedDistribution
 
 class AbstractionGame<S: State, LAbs, LConc>(
     val stateNodes: MutableSet<StateNode<S, LAbs, LConc>> = hashSetOf(),
@@ -85,7 +86,7 @@ class AbstractionGame<S: State, LAbs, LConc>(
 
     fun getOrCreateNodeWithChoices(
         choices: Set<Pair<
-                    EnumeratedDistribution<StateNode<S, LAbs, LConc>, MutableList<Stmt>>, LConc
+                EnumeratedDistribution<StateNode<S, LAbs, LConc>, MutableList<Stmt>>, LConc
                 >>
     ): ChoiceNode<S, LAbs, LConc> {
         // TODO: make the search more efficient by pre-partitioning the list

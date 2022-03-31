@@ -19,6 +19,7 @@ import hu.bme.mit.theta.core.utils.PathUtils
 import hu.bme.mit.theta.core.utils.PrimeCounter
 import hu.bme.mit.theta.core.utils.indexings.VarIndexing
 import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
+import hu.bme.mit.theta.prob.pcfa.ProbStmt
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 import java.util.*
@@ -31,7 +32,9 @@ class BasicCartesianGroupedTransFunc(
     private val litPrefix = "__" + javaClass.simpleName + "_" + PredGroupedTransFunc.instanceCounter + "_"
 
     override fun getSuccStates(state: PredState, action: StmtAction, prec: PredPrec): List<List<PredState>> {
-        val stmt = if(action.stmts.size == 1) action.stmts.first() else SequenceStmt.of(action.stmts)
+        val stmt =
+            if(action.stmts.size == 1) action.stmts.first()
+            else SequenceStmt.of(action.stmts)
         return when(stmt) {
             is NonDetStmt -> handleNonDet(stmt, state, prec)
             is HavocStmt<*> -> {
@@ -41,7 +44,7 @@ class BasicCartesianGroupedTransFunc(
                     handleHavocGeneral(stmt, state, prec)
             }
             is SequenceStmt ->
-                if (stmt.stmts.any {it is HavocStmt<*> }) TODO()
+                if (stmt.stmts.any {it is HavocStmt<*>  || it is ProbStmt}) TODO()
                 else getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
             else -> {
                 getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }

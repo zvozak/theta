@@ -1,4 +1,4 @@
-package hu.bme.mit.theta.prob
+package hu.bme.mit.theta.prob.pcfa
 
 import hu.bme.mit.theta.cfa.CFA
 import hu.bme.mit.theta.cfa.CFA.Loc
@@ -14,6 +14,7 @@ import hu.bme.mit.theta.core.type.booltype.*
 import hu.bme.mit.theta.core.type.booltype.BoolExprs.*
 import hu.bme.mit.theta.core.type.inttype.*
 import hu.bme.mit.theta.core.type.inttype.IntExprs.*
+import hu.bme.mit.theta.prob.EnumeratedDistribution
 
 fun CFA(func: CFA.Builder.() -> Unit): CFA {
     val builder = CFA.builder()
@@ -79,9 +80,11 @@ infix fun Expr<BoolType>.or(other: Expr<BoolType>): OrExpr = BoolExprs.Or(this, 
 
 fun prob(distr: EnumeratedDistribution<Stmt, Unit>): ProbStmt = ProbStmt(distr)
 fun coin(v: VarDecl<BoolType>, e1: Double, e2: Double): ProbStmt =
-    ProbStmt(EnumeratedDistribution(
+    ProbStmt(
+        EnumeratedDistribution(
         listOf( (v assign True()) to (e1/(e1+e2)), (v assign False()) to (e2/(e1+e2)) )
-    ))
+    )
+    )
 fun uniform(v: VarDecl<IntType>, n: Int): ProbStmt =
     ProbStmt(EnumeratedDistribution(
         (0 until n).map { (v assign it) to (1.0/n) }

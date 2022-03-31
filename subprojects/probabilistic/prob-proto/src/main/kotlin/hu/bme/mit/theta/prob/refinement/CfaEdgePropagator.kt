@@ -14,7 +14,7 @@ import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.ExprSimplifier
 import hu.bme.mit.theta.core.utils.ExprUtils
 import hu.bme.mit.theta.core.utils.WpState
-import hu.bme.mit.theta.prob.AbstractionGame
+import hu.bme.mit.theta.prob.game.AbstractionGame
 
 object cfaEdgePropagator: PredicatePropagator {
     override fun <LAbs : StmtAction, LConc> propagate(

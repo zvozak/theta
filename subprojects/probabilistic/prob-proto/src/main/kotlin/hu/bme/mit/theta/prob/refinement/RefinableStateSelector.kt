@@ -1,8 +1,8 @@
 package hu.bme.mit.theta.prob.refinement
 
 import hu.bme.mit.theta.analysis.State
-import hu.bme.mit.theta.prob.AbstractionGame
-import hu.bme.mit.theta.prob.doubleEquals
+import hu.bme.mit.theta.prob.game.AbstractionGame
+import hu.bme.mit.theta.prob.game.doubleEquals
 import java.util.*
 
 interface RefinableStateSelector {

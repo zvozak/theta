@@ -10,8 +10,7 @@ import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
-import hu.bme.mit.theta.prob.refinement.GlobalCfaExplRefiner
-import hu.bme.mit.theta.prob.refinement.nearestRefinableStateSelector
+import hu.bme.mit.theta.prob.pcfa.*
 import hu.bme.mit.theta.prob.transfunc.CfaGroupedTransFunc
 import hu.bme.mit.theta.prob.transfunc.ExplStmtGroupedTransFunc
 import hu.bme.mit.theta.prob.transfunc.PredGroupedTransFunc
@@ -96,13 +95,14 @@ class OTFMDPAbstractionTests {
         val explInitPrec = GlobalCfaPrec.create(ExplPrec.empty())
 
 
-        val checkResult = checkThresholdProperty(
-            explTransFunc, lts, explInitFunc,
-            explInitPrec,
-            model.errorLoc.get(), model.finalLoc.get(), OptimType.MAX,
-            0.1, ThresholdType.LESS_THAN,
-            GlobalCfaExplRefiner(), nearestRefinableStateSelector
-        )
+//        val checkResult = checkThresholdProperty(
+//            explTransFunc, lts, explInitFunc,
+//            explInitPrec,
+//            model.errorLoc.get(), model.finalLoc.get(), OptimType.MAX,
+//            0.1, ThresholdType.LESS_THAN,
+//            GlobalCfaExplRefiner(), nearestRefinableStateSelector,
+//            true
+//        )
 
     }
 }

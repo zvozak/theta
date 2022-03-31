@@ -1,6 +1,8 @@
-package hu.bme.mit.theta.prob
+package hu.bme.mit.theta.prob.game
 
 import hu.bme.mit.theta.analysis.State
+import hu.bme.mit.theta.prob.refinement.ChoiceNodeValues
+import hu.bme.mit.theta.prob.refinement.StateNodeValues
 
 data class GameConversionResult<S: State, LAbs, LConc>(
     val result: StochasticGame<S, Unit, LAbs, LConc>,
@@ -9,7 +11,7 @@ data class GameConversionResult<S: State, LAbs, LConc>(
 )
 
 fun <S: State, LAbs, LConc> AbstractionGame<S, LAbs, LConc>.toStochasticGame():
- GameConversionResult<S, LAbs, LConc>{
+        GameConversionResult<S, LAbs, LConc> {
     val result = StochasticGame<S, Unit, LAbs, LConc>()
     val aNodeMap = hashMapOf<AbstractionGame.StateNode<S, LAbs, LConc>,
                                 StochasticGame<S, Unit, LAbs, LConc>.ANode>()
@@ -43,6 +45,11 @@ fun <K, V> Map<K, V>.inverseImage(): Map<V, List<K>> {
     }
     return res
 }
+infix fun <K, T, V> Map<T, V>.compose(other: Map<K, T>): Map<K, V> =
+    other.mapValues { (_, v) ->
+        this[v] ?:
+        throw java.lang.IllegalArgumentException("Non-composable maps: the value for $v is missing")
+    }
 
 fun <S: State, C, LAbs, LConc> sgValsFromAgVals(
     VA: StateNodeValues<S, LAbs, LConc>,

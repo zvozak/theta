@@ -12,9 +12,9 @@ import hu.bme.mit.theta.core.stmt.SequenceStmt
 import hu.bme.mit.theta.core.utils.ExprSimplifier
 import hu.bme.mit.theta.core.utils.ExprUtils
 import hu.bme.mit.theta.core.utils.WpState
-import hu.bme.mit.theta.prob.AbstractionGame
-import hu.bme.mit.theta.prob.ProbStmt
-import hu.bme.mit.theta.prob.doubleEquals
+import hu.bme.mit.theta.prob.game.AbstractionGame
+import hu.bme.mit.theta.prob.pcfa.ProbStmt
+import hu.bme.mit.theta.prob.game.doubleEquals
 
 class GlobalCfaPredRefiner<S: ExprState, LConc>: PrecRefiner<
         GlobalCfaPrec<PredPrec>, S, CfaAction, LConc> {

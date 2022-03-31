@@ -1,5 +1,6 @@
 package hu.bme.mit.theta.prob
 
+import com.google.common.base.Stopwatch
 import hu.bme.mit.theta.analysis.Prec
 import hu.bme.mit.theta.analysis.expl.ExplInitFunc
 import hu.bme.mit.theta.analysis.expl.ExplPrec
@@ -19,13 +20,24 @@ import hu.bme.mit.theta.cfa.analysis.lts.CfaSbeLts
 import hu.bme.mit.theta.cfa.analysis.prec.GlobalCfaPrec
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
+import hu.bme.mit.theta.prob.game.MDPAbstractionAnalyzer
+import hu.bme.mit.theta.prob.game.ThresholdType
+import hu.bme.mit.theta.prob.game.analysis.AbstractionGameAnalysis
+import hu.bme.mit.theta.prob.game.analysis.OptimType
 import hu.bme.mit.theta.prob.refinement.*
 import hu.bme.mit.theta.prob.transfunc.BasicCartesianGroupedTransFunc
 import hu.bme.mit.theta.prob.transfunc.CfaGroupedTransFunc
 import hu.bme.mit.theta.prob.transfunc.ExplStmtGroupedTransFunc
 import hu.bme.mit.theta.prob.transfunc.PredGroupedTransFunc
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import org.koin.core.context.startKoin
+import org.koin.dsl.module
+import java.io.OutputStream
 import java.lang.UnsupportedOperationException
+import java.util.concurrent.TimeUnit
 
 enum class RefinableSelection(val selector: RefinableStateSelector) {
     COARSEST(coarsestRefinableStateSelector),
@@ -40,6 +52,7 @@ enum class PredicatePropagation(val propagator: PredicatePropagator) {
     CFA(cfaEdgePropagator)
 }
 
+@Serializable
 data class PCFAConfig(
     val domain: CfaConfigBuilder.Domain,
     val refinableSelection: RefinableSelection,
@@ -51,33 +64,68 @@ data class PCFAConfig(
     val lbe: Boolean,
     val exact: Boolean,
     val tolerance: Double,
-    val limit: Int
-)
+    val limit: Int,
+    val useBVI: Boolean,
+
+    @kotlinx.serialization.Transient val output: ()->OutputStream = { System.out }
+) {
+    override fun toString(): String {
+        return Json.encodeToString(this)
+    }
+}
 
 private typealias CfaPrecRefiner<S, P> = PrecRefiner<P, CfaState<S>, CfaAction, Unit>
 
+@Serializable
+data class PCFAAnalysisStats(
+    val propertyInterval: Pair<Double, Double>?,
+    val analysisTime: Long,
+    val timeUnit: TimeUnit
+
+
+) {
+    override fun toString(): String {
+        return Json.encodeToString(this)
+    }
+}
+
 fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
-    GraphDB.logDB = GraphDB("bolt://localhost:7687", "neo4j", "Theta")
+    val dataCollector = JsonDataCollector(cfg.output)
+
+    val m = module {
+        single { dataCollector as DataCollector }
+        single { AbstractionGameAnalysis() }
+    }
+    startKoin {
+        modules(m)
+    }
+    val analyzer = MDPAbstractionAnalyzer()
+
+    val stopwatch = Stopwatch.createStarted()
 
     val solver = Z3SolverFactory.getInstance().createSolver()
     val lts = CfaSbeLts.getInstance()
+
+    dataCollector.logGlobalData(cfg)
 
     fun <S: ExprState,  SubP : Prec, P : CfaPrec<SubP>> check(
         transferFunction: CfaGroupedTransFunc<S, SubP>,
         initFunc: CfaInitFunc<S, SubP>,
         initP: P, precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>
     ) = if (cfg.exact) {
-        computeProb(
+        analyzer.computeProb(
             transferFunction, lts, initFunc,
             initP, cfa.errorLoc.get(), cfa.finalLoc.get(),
-            cfg.optimType, cfg.tolerance, precRefiner, cfg.refinableSelection.selector
+            cfg.optimType, cfg.tolerance, precRefiner, cfg.refinableSelection.selector,
+            cfg.useBVI
         )
     } else {
-        checkThresholdProperty(
+        analyzer.checkThresholdProperty(
             transferFunction, lts, initFunc, initP,
             cfa.errorLoc.get(), cfa.finalLoc.get(),
             cfg.optimType, cfg.propertyThreshold, cfg.thresholdType,
-            precRefiner, cfg.refinableSelection.selector
+            precRefiner, cfg.refinableSelection.selector,
+            cfg.useBVI
         )
     }
 
@@ -119,4 +167,15 @@ fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
 
         CfaConfigBuilder.Domain.PRED_SPLIT -> throw UnsupportedOperationException()
     }
+
+    stopwatch.stop()
+    dataCollector.logGlobalData(
+        PCFAAnalysisStats(
+            null,
+            stopwatch.elapsed(TimeUnit.MILLISECONDS),
+            TimeUnit.MILLISECONDS
+        )
+    )
+
+    dataCollector.flush()
 }

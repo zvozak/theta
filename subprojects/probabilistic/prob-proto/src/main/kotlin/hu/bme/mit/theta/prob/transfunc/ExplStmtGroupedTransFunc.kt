@@ -16,7 +16,7 @@ import hu.bme.mit.theta.core.type.booltype.BoolExprs.And
 import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.*
 import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
-import hu.bme.mit.theta.prob.ProbStmt
+import hu.bme.mit.theta.prob.pcfa.ProbStmt
 import hu.bme.mit.theta.solver.Solver
 
 /**
@@ -29,10 +29,9 @@ class ExplStmtGroupedTransFunc(
 ): GroupedTransferFunction<ExplState, StmtAction, ExplPrec> {
 
     override fun getSuccStates(state: ExplState, action: StmtAction, prec: ExplPrec): List<List<ExplState>> {
-        require(action.stmts.size == 1)
-            { "Action-based LBE not supported - use Sequence statements to group multiple simple statements" }
-
-        val stmt = action.stmts.first()
+        val stmt =
+            if(action.stmts.size == 1) action.stmts.first()
+            else SequenceStmt.of(action.stmts)
         return when(stmt) {
             is ProbStmt -> handleProbStmt(stmt, state, prec, enumerationLimit)
             is NonDetStmt -> handleNonDet(stmt, state, prec, enumerationLimit)
@@ -40,7 +39,7 @@ class ExplStmtGroupedTransFunc(
                 // The simplified computation of havoc is always correct for explicit abstraction
                 listOf(getNonGroupedNextStates(state, stmt, prec, enumerationLimit))
             is SequenceStmt ->
-                if (stmt.stmts.any {it is HavocStmt<*>} || stmt.stmts.any {it is ProbStmt}) TODO()
+                if (stmt.stmts.any {it is HavocStmt<*>} || stmt.stmts.any {it is ProbStmt }) TODO()
                 else getNonGroupedNextStates(state, stmt, prec, enumerationLimit).map { listOf(it) }
             else ->
                 getNonGroupedNextStates(state, stmt, prec, enumerationLimit).map { listOf(it) }

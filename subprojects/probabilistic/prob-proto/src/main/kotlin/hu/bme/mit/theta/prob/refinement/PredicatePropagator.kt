@@ -7,7 +7,7 @@ import hu.bme.mit.theta.cfa.analysis.CfaState
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolType
-import hu.bme.mit.theta.prob.AbstractionGame
+import hu.bme.mit.theta.prob.game.AbstractionGame
 
 interface PredicatePropagator {
     fun <LAbs: StmtAction, LConc> propagate(

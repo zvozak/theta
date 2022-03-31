@@ -1,9 +1,12 @@
-package hu.bme.mit.theta.prob
+package hu.bme.mit.theta.prob.game
 
 import hu.bme.mit.theta.common.visualization.EdgeAttributes
 import hu.bme.mit.theta.common.visualization.Graph
 import hu.bme.mit.theta.common.visualization.LineStyle
 import hu.bme.mit.theta.common.visualization.NodeAttributes
+import hu.bme.mit.theta.prob.game.analysis.OptimType
+import hu.bme.mit.theta.prob.game.analysis.argSelect
+import hu.bme.mit.theta.prob.game.analysis.select
 import java.awt.Color
 import java.util.*
 import kotlin.collections.ArrayList
@@ -20,9 +23,20 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
     }
 
     // Nodes
-    abstract inner class Node(var owner: Player, val isInit: Boolean = false) {
-        abstract val outEdges: ArrayList<Edge>
+    abstract inner class Node(var owner: Player, _isInit: Boolean = false) {
+        abstract val outEdges: ArrayList<out Edge>
         abstract val inEdges: ArrayList<Edge>
+
+        var isInit: Boolean = _isInit
+            set(value) {
+                if (value) {
+                    field = true
+                    if (this !in initNodes) initNodes.add(this)
+                } else {
+                    initNodes.remove(this)
+                    field = false
+                }
+            }
 
         fun optimStep(n: Int, V: (Node) -> Double, optim: (Player) -> OptimType) =
             step(n) { it.valueOptimalChoice(V, optim) }
@@ -46,7 +60,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
 
     inner class ANode(
         val s: SAbs,
-        override val outEdges: ArrayList<Edge> = arrayListOf(),
+        override val outEdges: ArrayList<AEdge> = arrayListOf(),
         override val inEdges: ArrayList<Edge> = arrayListOf(),
         isInit: Boolean = false
     ) : Node(Player.A, isInit) {
@@ -62,7 +76,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
 
     inner class CNode(
         val s: SConc,
-        override val outEdges: ArrayList<Edge> = arrayListOf(),
+        override val outEdges: ArrayList<CEdge> = arrayListOf(),
         override val inEdges: ArrayList<Edge> = arrayListOf(),
         isInit: Boolean = false
     ) : Node(Player.C, isInit) {
@@ -80,6 +94,18 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
     val cNodes: ArrayList<CNode> = arrayListOf()
     val allNodes get() = aNodes + cNodes
     val initNodes: ArrayList<Node> = arrayListOf()
+
+    fun getCNodeWithChoices(s: SConc, edges: Set<Pair<LConc, Map<Node, Double>>>) =
+        cNodes.firstOrNull {
+            it.outEdges.size == edges.size &&
+                    it.outEdges.all { Pair(it.lbl, it.end) in edges }
+        } ?: run {
+            val n = CNode(s)
+            for ((lbl, end) in edges) {
+                CEdge(lbl, n, end)
+            }
+            return@run n
+        }
 
 
     // Edges
@@ -131,18 +157,15 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
      * regardless of the move chosen by the other player, if the players choose only from permittedEdge.
      */
     private fun pre(forPlayer: Player, nodes: Set<Node>, permittedEdges: Set<Edge>): Set<Node> {
+        addSelfLoops()
         val potentialPreNodes =
             nodes.flatMap { it.inEdges }.intersect(permittedEdges).map { it.start }.toSet()
-                .union(nodes.filter { it.outEdges.isEmpty() }) // TODO: implement this more efficiently, and remove if self-loops are introduced
+                .union(nodes.filter { it.outEdges.isEmpty() })
         return potentialPreNodes.filter {
             if (it.owner == forPlayer) {
                 it.outEdges.intersect(permittedEdges).any { nodes.containsAll(it.end.keys) }
-                        // TODO: as absorbing states are currently represented by nodes without out-edges, this must be handled this way
-                        //       - if they had self-loops for convenience, this line could be removed
-                        || (it.outEdges.isEmpty() && it in nodes)
             } else {
                 it.outEdges.intersect(permittedEdges).all { nodes.containsAll(it.end.keys) }
-                        || (it.outEdges.isEmpty() && it in nodes) // TODO: same as above
             }
         }.toSet()
     }
@@ -407,7 +430,9 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
         msecOptimalityThreshold: Double = 1e-10,
         checkOnlyInits: Boolean = false
     ): Map<Node, Double> {
-        if(goal(Player.C) == goal(Player.A)) return BVI(goal(Player.A), UInit, LInit, convThreshold, checkOnlyInits)
+        if(goal(Player.C) == goal(Player.A)) {
+            return BVI(goal(Player.A), UInit, LInit, convThreshold, checkOnlyInits)
+        }
         this.addSelfLoops()
         var U = UInit
         var L = LInit

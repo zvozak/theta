@@ -1,7 +1,6 @@
-package hu.bme.mit.theta.prob
+package hu.bme.mit.theta.prob.game
 
 import java.util.*
-import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
 interface StochasticGamePass {
@@ -21,7 +20,7 @@ class MergedGame<SAbs, SConc, LAbs, LConc>(): StochasticGame<
         List<StochasticGame<SAbs, SConc, LAbs, LConc>.Edge>,
         >() {
     constructor(game: StochasticGame<SAbs, SConc, LAbs, LConc>): this() {
-        val nodeMap = hashMapOf<StochasticGame<SAbs, SConc, LAbs, LConc>.Node, Node>()
+        val nodeMap = hashMapOf<Node, Node>()
         for (aNode in game.aNodes) {
             TODO()
         }
@@ -98,7 +97,7 @@ object simplifySnakesPass {
 
 
         fun isSimplifiable(node: MergedStochasticGameNode<SAbs, SConc, LAbs, LConc>): Boolean {
-            return node.inEdges.size == 1 && node.outEdges.size == 1 &&
+            return !node.isInit && node.inEdges.size == 1 && node.outEdges.size == 1 &&
                     node.outEdges.first().end.keys.size == 1 &&
                     node.outEdges.first().end.keys.first().inEdges.size == 1
         }
@@ -114,8 +113,8 @@ object simplifySnakesPass {
                 else -> throw Exception()
             }
             val res = when(node.owner) {
-                StochasticGame.Companion.Player.A -> result.ANode(s.toMutableList())
-                StochasticGame.Companion.Player.C -> result.CNode(s.toMutableList())
+                StochasticGame.Companion.Player.A -> result.ANode(s.toMutableList(), isInit = node.isInit)
+                StochasticGame.Companion.Player.C -> result.CNode(s.toMutableList(), isInit = node.isInit)
             }
             nodeMap[node] = res
             q.add(node)
@@ -127,6 +126,7 @@ object simplifySnakesPass {
                 val nodeToMerge = curr.inEdges.first().start
                 val merged = nodeMap[curr]!!
                 nodeMap[nodeToMerge] = merged
+                if(nodeToMerge.isInit) merged.isInit = true
                 val s = when(nodeToMerge) {
                     is StochasticGame.ANode -> nodeToMerge.s.toMutableList()
                     is StochasticGame.CNode -> nodeToMerge.s.toMutableList()

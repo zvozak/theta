@@ -9,9 +9,9 @@ import hu.bme.mit.theta.cfa.analysis.CfaState
 import hu.bme.mit.theta.cfa.analysis.prec.LocalCfaPrec
 import hu.bme.mit.theta.core.stmt.NonDetStmt
 import hu.bme.mit.theta.core.utils.WpState
-import hu.bme.mit.theta.prob.AbstractionGame
-import hu.bme.mit.theta.prob.ProbStmt
-import hu.bme.mit.theta.prob.doubleEquals
+import hu.bme.mit.theta.prob.game.AbstractionGame
+import hu.bme.mit.theta.prob.pcfa.ProbStmt
+import hu.bme.mit.theta.prob.game.doubleEquals
 
 class LocalCfaPredRefiner<S: ExprState, LConc>(
     val predicatePropagator: PredicatePropagator

@@ -34,6 +34,9 @@ import hu.bme.mit.theta.frontend.transformation.ArchitectureConfig;
 import hu.bme.mit.theta.frontend.transformation.grammar.function.FunctionVisitor;
 import hu.bme.mit.theta.frontend.transformation.model.statements.CProgram;
 import hu.bme.mit.theta.frontend.transformation.model.statements.CStatement;
+import hu.bme.mit.theta.prob.game.ThresholdType;
+import hu.bme.mit.theta.prob.game.analysis.OptimType;
+import hu.bme.mit.theta.prob.pcfa.ProbStmt;
 import hu.bme.mit.theta.xcfa.model.XCFA;
 import hu.bme.mit.theta.xcfa.model.XcfaLabel;
 import hu.bme.mit.theta.xcfa.model.utils.FrontendXcfaBuilder;
@@ -90,10 +93,10 @@ public class ProbCli {
 	PredicatePropagation predicatePropagation = PredicatePropagation.NONE;
 
 	@Parameter(names = "--property-threshold", description = "")
-	double propertyThreshold = 0.01;
+	double propertyThreshold = 0.001;
 
 	@Parameter(names = "--property-type", description = "")
-	ThresholdType thresholdType = ThresholdType.LESS_THAN;
+    ThresholdType thresholdType = ThresholdType.LESS_THAN;
 
 	@Parameter(names = "--optim-type", description = "")
 	OptimType optimType = OptimType.MAX;
@@ -110,8 +113,14 @@ public class ProbCli {
 	@Parameter(names = "--tolerance", description = "Tolerance of the \"exact\" computation")
 	double tolerance = 1e-7;
 
-	@Parameter(names = "--limit", description = "Enumerationl limit when the explicit domain is used. Use 0 for unlimited enumeration.")
+	@Parameter(names = "--limit", description = "Enumeration limit when the explicit domain is used. Use 0 for unlimited enumeration.")
 	int limit = 0;
+
+	@Parameter(names = "--bvi", description = "Use BVI in the abstract model analysis instead of standard VI.")
+	boolean useBvi = false;
+
+	@Parameter(names = "--stats", description = "Output path for stats.")
+	String statsPath = "";
 
 	//////////// CONFIGURATION OPTIONS END ////////////
 
@@ -272,7 +281,16 @@ public class ProbCli {
 				lbe,
 				exact,
 				tolerance,
-				limit
+				limit,
+				useBvi,
+				statsPath.isEmpty() ? () -> System.out : () -> {
+					try {
+						return new FileOutputStream(statsPath);
+					} catch (FileNotFoundException e) {
+						e.printStackTrace();
+					}
+					return System.out;
+				}
 		);
 		System.err.flush();
 		try {

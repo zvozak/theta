@@ -1,6 +1,6 @@
 package hu.bme.mit.theta.prob.refinement
 
-import hu.bme.mit.theta.prob.AbstractionGame
+import hu.bme.mit.theta.prob.game.AbstractionGame
 
 typealias StateNodeValues<S, LAbs, LConc> = Map<AbstractionGame.StateNode<S, LAbs, LConc>, Double>
 typealias ChoiceNodeValues<S, LAbs, LConc> = Map<AbstractionGame.ChoiceNode<S, LAbs, LConc>, Double>

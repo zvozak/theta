@@ -9,7 +9,7 @@ import hu.bme.mit.theta.core.model.ImmutableValuation
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.ExprSimplifier
-import hu.bme.mit.theta.prob.AbstractionGame
+import hu.bme.mit.theta.prob.game.AbstractionGame
 
 object nonPropagatingPropagator: PredicatePropagator {
     override fun <LAbs : StmtAction, LConc> propagate(

@@ -1,9 +1,10 @@
-package hu.bme.mit.theta.prob
+package hu.bme.mit.theta.prob.game.analysis
 
 import hu.bme.mit.theta.analysis.State
-import hu.bme.mit.theta.prob.AbstractionGame.*
-import hu.bme.mit.theta.prob.ERGNode.WrappedChoiceNode
-import hu.bme.mit.theta.prob.ERGNode.WrappedStateNode
+import hu.bme.mit.theta.prob.game.AbstractionGame.*
+import hu.bme.mit.theta.prob.game.analysis.ERGNode.WrappedChoiceNode
+import hu.bme.mit.theta.prob.game.analysis.ERGNode.WrappedStateNode
+import hu.bme.mit.theta.prob.game.AbstractionGame
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
