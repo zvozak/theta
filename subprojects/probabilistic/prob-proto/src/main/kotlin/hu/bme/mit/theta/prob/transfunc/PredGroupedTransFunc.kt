@@ -22,6 +22,7 @@ import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.utils.*
 import hu.bme.mit.theta.core.utils.indexings.VarIndexing
 import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
+import hu.bme.mit.theta.prob.pcfa.ProbStmt
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 
@@ -30,7 +31,7 @@ fun Stmt.unfold(): StmtUnfoldResult =
 
 class PredGroupedTransFunc(
     val solver: Solver
-): GroupedTransferFunction<PredState, StmtAction, PredPrec> {
+): GroupedTransFunc<PredState, StmtAction, PredPrec> {
 
     private val actLits: ArrayList<ConstDecl<BoolType>> = arrayListOf()
     private val litPrefix = "__" + javaClass.simpleName + "_" + instanceCounter + "_"
@@ -38,21 +39,22 @@ class PredGroupedTransFunc(
     companion object { var instanceCounter = 0 }
     init { instanceCounter++ }
 
-    override fun getSuccStates(state: PredState, action: StmtAction, prec: PredPrec): List<List<PredState>> {
+    override fun getSuccStatesWithStmt(state: PredState, action: StmtAction, prec: PredPrec): List<List<Pair<Stmt, PredState>>> {
         val stmt = if(action.stmts.size == 1) action.stmts.first() else SequenceStmt.of(action.stmts)
         return when(stmt) {
+            is ProbStmt -> handleNonDet(stmt, state, prec)
             is NonDetStmt -> handleNonDet(stmt, state, prec)
-            is HavocStmt<*> -> {
+            is HavocStmt<*> -> { (
                 if(isSimplificationApplicable(stmt, prec))
                     handleHavocSimplified(stmt, state, prec)
                 else
                     handleHavocGeneral(stmt, state, prec)
-            }
+                ).map { it.map { stmt to it } } }
             is SequenceStmt ->
-                if (stmt.stmts.any {it is HavocStmt<*>}) TODO()
-                else getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
+                if (stmt.stmts.any {it is HavocStmt<*>} || stmt.stmts.any {it is NonDetStmt} ) TODO()
+                else getNonGroupedNextStates(state, stmt, prec).map { listOf(stmt to it) }
             else -> {
-                getNonGroupedNextStates(state, stmt, prec).map { listOf(it) }
+                getNonGroupedNextStates(state, stmt, prec).map { listOf(stmt to it) }
             }
         }
     }
@@ -110,7 +112,7 @@ class PredGroupedTransFunc(
         }
     }
 
-    private fun handleNonDet(stmt: NonDetStmt, state: PredState, prec: PredPrec): ArrayList<List<PredState>> {
+    private fun handleNonDet(stmt: NonDetStmt, state: PredState, prec: PredPrec): List<List<Pair<Stmt, PredState>>> {
         val stmts = stmt.stmts
 
         var maxPrimes = 0
@@ -123,7 +125,7 @@ class PredGroupedTransFunc(
             nextIndexings.add(primes)
             val vars = arrayListOf<VarDecl<*>>()
             ExprUtils.collectVars(expr, vars)
-            maxPrimes = vars.map(primes::get).max() ?: 0
+            maxPrimes = vars.maxOfOrNull(primes::get) ?: 0
             return@mapIndexed expr
         }.toMutableList()
         subExprs.add(state.toExpr())
@@ -133,7 +135,7 @@ class PredGroupedTransFunc(
         val preds = prec.preds.toList()
         val numActLits = preds.size * stmts.size
         generateActivationLiterals(numActLits)
-        val res = arrayListOf<List<PredState>>()
+        val res = arrayListOf<List<Pair<Stmt, PredState>>>()
 
         WithPushPop(solver).use { wp ->
             solver.add(PathUtils.unfold(fullExpr, VarIndexingFactory.indexing(0)))
@@ -153,7 +155,7 @@ class PredGroupedTransFunc(
                 feedback.add(BoolExprs.True())
 
                 litIdx = 0
-                val newStateList = arrayListOf<PredState>()
+                val newStateList = arrayListOf<Pair<Stmt, PredState>>()
                 for(a in stmts.indices) {
                     val newPreds = hashSetOf<Expr<BoolType>>()
                     for(pred in preds) {
@@ -170,7 +172,7 @@ class PredGroupedTransFunc(
                         }
                         litIdx++
                     }
-                    newStateList.add(PredState.of(newPreds))
+                    newStateList.add(stmts[a] to PredState.of(newPreds))
                 }
                 res.add(newStateList)
                 solver.add(Not(And(feedback)))

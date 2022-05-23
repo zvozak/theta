@@ -16,8 +16,12 @@ dependencies {
     implementation(project(":theta-xcfa"))
     implementation(project(":theta-c-frontend"))
 
+
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.1.0-RC")
     implementation("io.insert-koin:koin-core:3.1.5")
+
+    api("com.fasterxml.jackson.core:jackson-databind:2.9.7")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.9.7")
 }
 
 application {

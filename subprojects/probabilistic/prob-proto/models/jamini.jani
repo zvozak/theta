@@ -1,0 +1,80 @@
+{
+  "jani-version": 1,
+  "name": "jamini",
+  "type": "mdp",
+  "features": [],
+  "actions": [{
+    "name": "f"
+  }],
+  "variables": [
+    {
+      "name": "a",
+      "type": "int",
+      "initial-value": 0
+    }
+  ],
+  "properties": [],
+  "automata": [
+    {
+      "name":  "main",
+      "locations": [{
+        "name": "loc_0"
+      }],
+      "initial-locations": ["loc_0"],
+      "edges": [
+        {
+          "location": "loc_0",
+          "guard": {
+            "exp": {
+              "op": "=",
+              "left": "a",
+              "right": 0
+            }
+          },
+          "destinations": [
+            {
+              "location": "loc_0",
+              "probability": {
+                "exp": 0.5
+              },
+              "assignments": [{
+                "ref": "a",
+                "value": 1
+              }]
+            },
+            {
+              "location": "loc_0",
+              "probability": {
+                "exp": 0.5
+              },
+              "assignments": [{
+                "ref": "a",
+                "value": 0
+              }]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "system": {
+    "elements": [
+      {"automaton": "main"},
+      {"automaton": "main"}
+    ],
+    "syncs": [
+      {
+        "synchronise": ["f", null],
+        "result": "f"
+      },
+      {
+        "synchronise": [null, "f"],
+        "result": "f"
+      },
+      {
+        "synchronise": ["f", "f"],
+        "result": "f"
+      }
+    ]
+  }
+}

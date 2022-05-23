@@ -17,24 +17,24 @@ enum class OptimType {
 }
 fun <T> OptimType.select(m: Map<T, Double>): Double? =
     when(this) {
-        OptimType.MAX -> m.maxBy { it.value }?.value
-        OptimType.MIN -> m.minBy { it.value }?.value
+        OptimType.MAX -> m.maxByOrNull { it.value }?.value
+        OptimType.MIN -> m.minByOrNull { it.value }?.value
     }
 fun OptimType.select(l: List<Double>): Double? =
     when(this) {
-        OptimType.MAX -> l.max()
-        OptimType.MIN -> l.min()
+        OptimType.MAX -> l.maxOrNull()
+        OptimType.MIN -> l.minOrNull()
     }
 
 fun <T> OptimType.argSelect(m: Map<T, Double>): T?  =
     when(this) {
-        OptimType.MAX -> m.maxBy { it.value }?.key
-        OptimType.MIN -> m.minBy { it.value }?.key
+        OptimType.MAX -> m.maxByOrNull { it.value }?.key
+        OptimType.MIN -> m.minByOrNull { it.value }?.key
     }
 fun <T> OptimType.argSelect(m: List<Pair<T, Double>>): T?  =
     when(this) {
-        OptimType.MAX -> m.maxBy { it.second }?.first
-        OptimType.MIN -> m.minBy { it.second }?.first
+        OptimType.MAX -> m.maxByOrNull { it.second }?.first
+        OptimType.MIN -> m.minByOrNull { it.second }?.first
     }
 fun OptimType.unitForProb(): Double =
     when (this) {
@@ -261,7 +261,7 @@ fun <S : State, LAbs, LConc> BVI(
                 if(playerAGoal == OptimType.MAX) {
                     bestExit = msec.first.flatMap {
                         it.outgoingEdges.filter { it.end !in msec.second }.map { UC[it.end]!! }
-                    }.max() ?: 0.0
+                    }.maxOrNull() ?: 0.0
                 }
                 if(playerCGoal == OptimType.MAX) {
                     val bestAExit = msec.second.flatMap {
@@ -272,7 +272,7 @@ fun <S : State, LAbs, LConc> BVI(
                                     prob * (UA[stateNode]!!)
                                 }
                             }
-                    }.max() ?: 0.0
+                    }.maxOrNull() ?: 0.0
                     if(bestAExit > bestExit) bestExit = bestAExit
                 }
 
@@ -287,8 +287,8 @@ fun <S : State, LAbs, LConc> BVI(
         }
 
         val errorOnCheckedNodes = checkedStateNodes.sumByDouble { abs(UA[it]!! - LA[it]!!) }
-        val largestStateError = game.stateNodes.map { UA[it]!!-LA[it]!! }.max() ?: 0.0
-        val largestChoiceError = game.concreteChoiceNodes.map { UC[it]!!-LC[it]!! }.max() ?: 0.0
+        val largestStateError = game.stateNodes.map { UA[it]!!-LA[it]!! }.maxOrNull() ?: 0.0
+        val largestChoiceError = game.concreteChoiceNodes.map { UC[it]!!-LC[it]!! }.maxOrNull() ?: 0.0
         val largestError = max(largestStateError, largestChoiceError)
     } while(largestError > threshold)
 //    } while(largestError > threshold)

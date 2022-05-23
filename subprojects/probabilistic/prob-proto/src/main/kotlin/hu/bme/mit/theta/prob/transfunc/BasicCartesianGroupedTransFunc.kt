@@ -26,7 +26,7 @@ import java.util.*
 
 class BasicCartesianGroupedTransFunc(
     val solver: Solver
-): GroupedTransferFunction<PredState, StmtAction, PredPrec> {
+): GroupedTransFunc<PredState, StmtAction, PredPrec> {
 
     private val actLits: ArrayList<ConstDecl<BoolType>> = arrayListOf()
     private val litPrefix = "__" + javaClass.simpleName + "_" + PredGroupedTransFunc.instanceCounter + "_"
@@ -71,7 +71,7 @@ class BasicCartesianGroupedTransFunc(
             nextIndexings.add(primes)
             val vars = arrayListOf<VarDecl<*>>()
             ExprUtils.collectVars(expr, vars)
-            maxPrimes = vars.map(primes::get).max() ?: 0
+            maxPrimes = vars.maxOfOrNull(primes::get) ?: 0
             return@mapIndexed expr
         }.toMutableList()
         subExprs.add(state.toExpr())
@@ -192,5 +192,13 @@ class BasicCartesianGroupedTransFunc(
         }
 
         return listOf(PredState.of(newStatePreds))
+    }
+
+    override fun getSuccStatesWithStmt(
+        state: PredState,
+        action: StmtAction,
+        prec: PredPrec
+    ): List<List<Pair<Stmt, PredState>>> {
+        TODO("Not yet implemented")
     }
 }

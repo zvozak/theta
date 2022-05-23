@@ -24,8 +24,8 @@ class LocalCfaPredRefiner<S: ExprState, LConc>(
         VCmin: ChoiceNodeValues<S, CfaAction, LConc>, VCmax: ChoiceNodeValues<S, CfaAction, LConc>,
     ): LocalCfaPrec<PredPrec> {
         val choices = stateToRefine.outgoingEdges
-        val max = choices.mapNotNull{VCmax[it.end]}.max()!!
-        val min = choices.mapNotNull{VCmin[it.end]}.min()!!
+        val max = choices.mapNotNull{VCmax[it.end]}.maxOrNull()!!
+        val min = choices.mapNotNull{VCmin[it.end]}.minOrNull()!!
         val maxChoices = choices.filter { doubleEquals(max, VCmax[it.end]!!) }.toSet()
         val minChoices = choices.filter { doubleEquals(min, VCmin[it.end]!!) }.toSet()
 

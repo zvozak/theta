@@ -24,8 +24,8 @@ class GlobalCfaExplRefiner<LConc>: PrecRefiner<
     ): GlobalCfaPrec<ExplPrec> {
 
         val choices = stateToRefine.outgoingEdges
-        val max = choices.mapNotNull{VCmax[it.end]}.max()!!
-        val min = choices.mapNotNull{VCmin[it.end]}.min()!!
+        val max = choices.mapNotNull{VCmax[it.end]}.maxOrNull()!!
+        val min = choices.mapNotNull{VCmin[it.end]}.minOrNull()!!
         val maxChoices = choices.filter { doubleEquals(max, VCmax[it.end]!!) }.toSet()
         val minChoices = choices.filter { doubleEquals(min, VCmin[it.end]!!) }.toSet()
 

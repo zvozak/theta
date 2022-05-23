@@ -20,8 +20,8 @@ fun <S: State, LAbs, LConc> isRefinable(
 ): Boolean {
     val choices = s.outgoingEdges.map { it.end }
     if (choices.isEmpty()) return false
-    val max = choices.mapNotNull(VCmax::get).max()!!
-    val min = choices.mapNotNull(VCmin::get).min()!!
+    val max = choices.mapNotNull(VCmax::get).maxOrNull()!!
+    val min = choices.mapNotNull(VCmin::get).minOrNull()!!
     val maxChoices = choices.filter { doubleEquals(max, VCmax[it]!!) }.toSet()
     val minChoices = choices.filter { doubleEquals(min, VCmin[it]!!) }.toSet()
     return maxChoices!=minChoices
@@ -33,7 +33,7 @@ object coarsestRefinableStateSelector: RefinableStateSelector {
         VAmin: StateNodeValues<S, LAbs, LConc>, VAmax: StateNodeValues<S, LAbs, LConc>,
         VCmin: ChoiceNodeValues<S, LAbs, LConc>, VCmax: ChoiceNodeValues<S, LAbs, LConc>
     ): AbstractionGame.StateNode<S, LAbs, LConc>? {
-        return game.stateNodes.filter{ isRefinable(it, VCmax, VCmin) }.maxBy { VAmax[it]!!-VAmin[it]!! } !!
+        return game.stateNodes.filter{ isRefinable(it, VCmax, VCmin) }.maxByOrNull { VAmax[it]!!-VAmin[it]!! } !!
     }
 }
 
@@ -45,7 +45,7 @@ object randomizedCoarsestRefinableStateSelector: RefinableStateSelector {
     ): AbstractionGame.StateNode<S, LAbs, LConc>? {
         val refineables = game.stateNodes.filter { isRefinable(it, VCmax, VCmin) }
         val diffs = refineables.map { it to VAmax[it]!! - VAmin[it]!! }
-        val max = diffs.maxBy { it.second }!!
+        val max = diffs.maxByOrNull { it.second }!!
         val maxRefineables = diffs.filter { it.second == max.second }
         val rand = Random().nextInt(maxRefineables.size)
         return maxRefineables[rand].first

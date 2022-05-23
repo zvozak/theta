@@ -51,9 +51,9 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
 
         fun valueOptimalChoice(V: (Node) -> Double, optim: (Player) -> OptimType): Edge? {
             return optim(this.owner).argSelect(
-                outEdges.map {
-                    it to it.end.entries.sumByDouble { it.value * V(it.key) }
-                }.toMap()
+                outEdges.associateWith {
+                    it.end.entries.sumByDouble { (node, prob) -> prob * V(node) }
+                }
             )
         }
     }
@@ -151,6 +151,8 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
     val aEdges: ArrayList<AEdge> = arrayListOf()
     val cEdges: ArrayList<CEdge> = arrayListOf()
     val allEdges get() = aEdges + cEdges
+    fun edge(lbl: LConc?, start: CNode, end: Map<Node, Double>) = CEdge(lbl, start, end)
+    fun edge(lbl: LAbs?, start: ANode, end: Map<Node, Double>) = AEdge(lbl, start, end)
 
     /**
      * Computes the set of states from which player forPlayer can be sure of entering the set nodes in one round,
@@ -352,7 +354,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
         return nodeSCCs
     }
 
-    private fun computeSCCs(
+    fun computeSCCs(
         nodes: List<Node>,
         ergEdgeList: List<List<Int>>
     ): List<Set<Int>> {
@@ -443,7 +445,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
             val optimalEdges = allNodes.associateWith {
                 if (goal(it.owner) == OptimType.MAX) it.outEdges
                 val edgeVals = it.outEdges.associateWith { computeEdgeValue(it, L) }
-                val optim = edgeVals.values.min()
+                val optim = edgeVals.values.minOrNull()
                     ?: throw Exception("No out edges on node $it - use self loops for absorbing states!")
                 it.outEdges.filter { edgeVals[it]!! - optim < msecOptimalityThreshold }
             }
@@ -453,14 +455,14 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
             for (msec in msecs) {
                 val bestExit = msec.filter { goal(it.owner) == OptimType.MAX }.flatMap {
                     it.outEdges.map { computeEdgeValue(it, U) }
-                }.max() ?: 0.0
+                }.maxOrNull() ?: 0.0
                 for (node in msec) {
                     UDefl[node] = min(U[node]!!, bestExit)
                 }
             }
             U = UDefl
 
-            val maxError = (if (checkOnlyInits) initNodes else allNodes).map { U[it]!! - L[it]!! }.max()!!
+            val maxError = (if (checkOnlyInits) initNodes else allNodes).map { U[it]!! - L[it]!! }.maxOrNull()!!
         } while (maxError > convThreshold)
 
         return allNodes.associateWith { (U[it]!! + L[it]!!) / 2 }
@@ -478,7 +480,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
         checkOnlyInits: Boolean = false
     ): Map<Node, Double> {
         this.addSelfLoops()
-        val (collapsedGame, nodeMap) = collapseMecs(this)
+        val (collapsedGame, nodeMap) = collapseMecs(this, goal == OptimType.MIN)
 
         // Maps a value function on the original game to one on the collapsed game
         // The value of a collapsed MEC is the best value among the nodes of the MEC
@@ -492,11 +494,64 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
         do {
             L = collapsedGame.bellmanStep({ goal }, L)
             U = collapsedGame.bellmanStep({ goal }, U)
-            val maxError = (if (checkOnlyInits) collapsedGame.initNodes else collapsedGame.allNodes)
-                .map { U[it]!! - L[it]!! }.max()!!
+            val maxError =
+                (if (checkOnlyInits) collapsedGame.initNodes else collapsedGame.allNodes)
+                    .maxOf { U[it]!! - L[it]!! }
         } while (maxError > convThreshold)
         val result = allNodes.associateWith { (U[nodeMap[it]]!! + L[nodeMap[it]]!!) / 2 }
         return result
+    }
+
+    /**
+     * Performs (one-sided) topological value iteration
+     */
+    fun TVI(
+        goal: (Player) -> OptimType,
+        VInit: Map<Node, Double>,
+        convThreshold: Double,
+    ): Map<Node, Double> {
+        if(goal(Player.A) == goal(Player.C)) {
+            val goal = goal(Player.A)
+            val (collapsed, nodeMap) = collapseMecs(this, goal == OptimType.MIN)
+
+            var V = VInit.entries
+                .groupBy({ nodeMap[it.key]!! }, { it.value })
+                .mapValues { goal.select(it.value)!! }
+            val nodes = collapsed.allNodes
+            val ergEdges = nodes.map {
+                it.outEdges.flatMap { it.end.keys.map { nodes.indexOf(it) } }
+            }
+            val sccs = collapsed.computeSCCs(nodes, ergEdges).reversed().map {
+                it.map { nodes[it] }
+            }
+            for (scc in sccs) {
+                do {
+                    val VNext = collapsed.bellmanStep({goal}, V, scc)
+                    val maxChange = scc.maxOf { abs(VNext[it]!! - V[it]!!) }
+                    V = VNext
+                } while (maxChange > convThreshold)
+            }
+
+            val VRes = allNodes.associateWith { V[nodeMap[it]]!! }
+            return VRes
+        } else {
+            val nodes = allNodes
+            val ergEdges = nodes.map {
+                it.outEdges.flatMap { it.end.keys.map { nodes.indexOf(it) } }
+            }
+            val sccs = computeSCCs(nodes, ergEdges).reversed().map {
+                it.map { nodes[it] }
+            }
+            var V = VInit
+            for (scc in sccs) {
+                do {
+                    val VNext = bellmanStep(goal, V, scc)
+                    val maxChange = scc.maxOf { abs(VNext[it]!! - V[it]!!) }
+                    V = VNext
+                } while (maxChange > convThreshold)
+            }
+            return V
+        }
     }
 
     private fun computeEdgeValue(e: Edge, V: Map<Node, Double>) =
@@ -506,16 +561,16 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
 
     private fun bellmanStep(
         goal: (Player) -> OptimType,
-        V: Map<Node, Double>
+        V: Map<Node, Double>,
+        updateSet: List<Node> = allNodes
     ): Map<Node, Double> {
 //        val VNew = hashMapOf<Node, Double>()
         val VNew = V.toMutableMap()
-        for (node in allNodes) {
+        for (node in updateSet) {
             val edgeValues = node.outEdges.map { computeEdgeValue(it, VNew) }
             VNew[node] = goal(node.owner).select(edgeValues)
                 ?: throw Exception("No out edges on node $node - use self loops for absorbing states!")
         }
-
         return VNew
     }
 
@@ -527,7 +582,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
     ): Map<Node, Double> {
         if (goal(Player.A) == goal(Player.C)) {
             val goal = goal(Player.A)
-            val (collapsed, nodeMap) = collapseMecs(this)
+            val (collapsed, nodeMap) = collapseMecs(this, goal == OptimType.MIN)
 
             var V = VInit.entries
                 .groupBy({ nodeMap[it.key]!! }, { it.value })
@@ -535,8 +590,8 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
             do {
                 val VNext = collapsed.bellmanStep({goal}, V)
                 val maxChange =
-                    (if(checkOnlyInits) collapsed.initNodes else collapsed.allNodes)
-                        .map { abs(VNext[it]!!-V[it]!!) }.max()!!
+                    (if (checkOnlyInits) collapsed.initNodes else collapsed.allNodes)
+                        .maxOf { abs(VNext[it]!! - V[it]!!) }
                 V = VNext
             } while (maxChange > convThreshold)
 
@@ -548,7 +603,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
                 val VNext = bellmanStep(goal, V)
                 val maxChange =
                     (if (checkOnlyInits) initNodes else allNodes)
-                        .map { abs(VNext[it]!!-V[it]!!) }.max()!!
+                        .maxOf { abs(VNext[it]!! - V[it]!!) }
                 V = VNext
             } while (maxChange > convThreshold)
             return V

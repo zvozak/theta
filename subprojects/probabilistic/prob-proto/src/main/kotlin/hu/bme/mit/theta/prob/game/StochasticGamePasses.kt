@@ -3,11 +3,6 @@ package hu.bme.mit.theta.prob.game
 import java.util.*
 import kotlin.collections.HashMap
 
-interface StochasticGamePass {
-    fun <SAbs, SConc, LAbs, LConc>
-            apply(game: StochasticGame<SAbs, SConc, LAbs, LConc>): PassResult<SAbs, SConc, LAbs, LConc>
-}
-
 data class PassResult<SAbs, SConc, LAbs, LConc>(
     val result: StochasticGame<SAbs, SConc, LAbs, LConc>,
     val nodeMap: Map<StochasticGame<SAbs, SConc, LAbs, LConc>.Node, StochasticGame<SAbs, SConc, LAbs, LConc>.Node>
@@ -239,7 +234,10 @@ object iterativeSimplificationPass {
  * actually an MDP, as all nodes are ANodes in the game (MEC collapsing only makes sense when
  * a game is treated as an MDP).
  */
-fun <SAbs, SConc, LAbs, LConc> collapseMecs(game: StochasticGame<SAbs, SConc, LAbs, LConc>): Pair<
+fun <SAbs, SConc, LAbs, LConc> collapseMecs(
+    game: StochasticGame<SAbs, SConc, LAbs, LConc>,
+    useMecSelfLoops: Boolean
+): Pair<
         MergedStochasticGame<SAbs, SConc, LAbs, LConc>,
         HashMap<
                 StochasticGame<SAbs, SConc, LAbs, LConc>.Node,
@@ -267,8 +265,9 @@ fun <SAbs, SConc, LAbs, LConc> collapseMecs(game: StochasticGame<SAbs, SConc, LA
         val resultEnd = edge.end.entries.map { (k,v) -> nodeMap[k]!! to v }.groupingBy { it.first }.fold(0.0) {
             acc, elem -> acc + elem.second
         }
-        if(resultEnd.size == 1 && resultStart == resultEnd.keys.first()) continue
-        result.AEdge(listOf(edge), resultStart, resultEnd)
+        if(!useMecSelfLoops && resultEnd.size == 1 && resultStart == resultEnd.keys.first()) continue
+        if (!resultStart.outEdges.any {it.end == resultEnd})
+            result.AEdge(listOf(edge), resultStart, resultEnd)
     }
 
     result.addSelfLoops()

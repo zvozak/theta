@@ -26,15 +26,36 @@ import hu.bme.mit.theta.solver.Solver
 class ExplStmtGroupedTransFunc(
     val solver: Solver,
     val enumerationLimit: Int = 0
-): GroupedTransferFunction<ExplState, StmtAction, ExplPrec> {
-
-    override fun getSuccStates(state: ExplState, action: StmtAction, prec: ExplPrec): List<List<ExplState>> {
+): GroupedTransFunc<ExplState, StmtAction, ExplPrec> {
+    override fun getSuccStatesWithStmt(
+        state: ExplState,
+        action: StmtAction,
+        prec: ExplPrec
+    ): List<List<Pair<Stmt, ExplState>>> {
         val stmt =
             if(action.stmts.size == 1) action.stmts.first()
             else SequenceStmt.of(action.stmts)
         return when(stmt) {
             is ProbStmt -> handleProbStmt(stmt, state, prec, enumerationLimit)
             is NonDetStmt -> handleNonDet(stmt, state, prec, enumerationLimit)
+            is HavocStmt<*> ->
+                // The simplified computation of havoc is always correct for explicit abstraction
+                listOf(getNonGroupedNextStates(state, stmt, prec, enumerationLimit).map { stmt to it })
+            is SequenceStmt ->
+                if (stmt.stmts.any {it is HavocStmt<*>} || stmt.stmts.any {it is ProbStmt }) TODO()
+                else getNonGroupedNextStates(state, stmt, prec, enumerationLimit).map { listOf(stmt to it) }
+            else ->
+                getNonGroupedNextStates(state, stmt, prec, enumerationLimit).map { listOf(stmt to it) }
+        }
+    }
+
+    override fun getSuccStates(state: ExplState, action: StmtAction, prec: ExplPrec): List<List<ExplState>> {
+        val stmt =
+            if(action.stmts.size == 1) action.stmts.first()
+            else SequenceStmt.of(action.stmts)
+        return when(stmt) {
+            is ProbStmt -> handleProbStmt(stmt, state, prec, enumerationLimit).map { it.map { it.second } }
+            is NonDetStmt -> handleNonDet(stmt, state, prec, enumerationLimit).map { it.map { it.second } }
             is HavocStmt<*> ->
                 // The simplified computation of havoc is always correct for explicit abstraction
                 listOf(getNonGroupedNextStates(state, stmt, prec, enumerationLimit))
@@ -46,7 +67,8 @@ class ExplStmtGroupedTransFunc(
         }
     }
 
-    private fun handleProbStmt(stmt: ProbStmt, state: ExplState, prec: ExplPrec, limit: Int = 0): List<List<ExplState>> {
+    private fun handleProbStmt(stmt: ProbStmt, state: ExplState, prec: ExplPrec, limit: Int = 0):
+            List<List<Pair<Stmt, ExplState>>> {
         val stmts = stmt.stmts
         val valuations = Array(stmts.size) {MutableValuation.copyOf(state)}
         val applyResults =
@@ -54,13 +76,16 @@ class ExplStmtGroupedTransFunc(
             // if the application is successful
             stmts.mapIndexed { idx, it -> StmtApplier.apply(it, valuations[idx], true)}
 
+        // Unlike for regular non-det statements, if one of the substatements leads to bottom, then the
+        // whole probstatement is considered to fail, as the resulting probabilities on non-bottom states
+        // would not sum to 1
         if(applyResults.contains(StmtApplier.ApplyResult.BOTTOM)) return listOf()
-        return listOf(valuations.map { ExplState.of(it) })
+        return listOf(valuations.mapIndexed { idx, it -> stmts[idx] to prec.createState(it) })
     }
 
     private fun handleNonDet(
         stmt: NonDetStmt, state: ExplState, prec: ExplPrec, limit: Int = 0
-    ): List<List<ExplState>> {
+    ): List<List<Pair<Stmt, ExplState>>> {
         val stmts = stmt.stmts
         val valuations = Array(stmts.size) {MutableValuation.copyOf(state)}
         val applyResults =
@@ -68,7 +93,7 @@ class ExplStmtGroupedTransFunc(
             // if the application is successful
             stmts.mapIndexed { idx, it -> StmtApplier.apply(it, valuations[idx], true)}
 
-        return listOf(valuations.map { ExplState.of(it) })
+        return listOf(valuations.mapIndexed { idx, it -> stmts[idx] to prec.createState(it) })
 //
 //        var maxPrimes = 0
 //        val nextIndexings = arrayListOf<VarIndexing>()
