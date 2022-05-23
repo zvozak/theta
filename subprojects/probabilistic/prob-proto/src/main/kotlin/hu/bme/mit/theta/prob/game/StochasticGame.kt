@@ -328,7 +328,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
         val nodes = allNodes
         val nodeIndices = allNodes.withIndex().associate { it.value to it.index }
         val ergEdgeList = nodes.map {
-            allowedEdges[it]!!.flatMap { it.end.keys.mapNotNull(nodeIndices::get) }.toSet().toList()
+            allowedEdges.getOrDefault(it, listOf()).flatMap { it.end.keys.mapNotNull(nodeIndices::get) }.toSet().toList()
         }.toMutableList()
 
         var sccs: List<Set<Int>>
@@ -398,7 +398,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
             }
         }
 
-        val q: Queue<Int> = ArrayDeque<Int>()
+        val q: Queue<Int> = ArrayDeque()
         val assigned = Array(E.size) { false }
         val SCCs: ArrayList<Set<Int>> = arrayListOf()
         while (!L.empty()) {
@@ -554,8 +554,106 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
         }
     }
 
+    /**
+     * Topological Bounded Value iteration for stochastic games. The goals of the player might be opposing.
+     * Uses deflation to make the upper approximation converge.
+     */
+    fun TBVI(
+        goal: (Player) -> OptimType,
+        UInit: Map<Node, Double>,
+        LInit: Map<Node, Double>,
+        convThreshold: Double,
+        msecOptimalityThreshold: Double = 1e-10,
+    ): Map<Node, Double> {
+        if(goal(Player.C) == goal(Player.A)) {
+            return TBVI(goal(Player.A), UInit, LInit, convThreshold)
+        }
+        this.addSelfLoops()
+        var U = UInit
+        var L = LInit
+
+        val nodes = allNodes
+        val ergEdges = nodes.map {
+            it.outEdges.flatMap { it.end.keys.map { nodes.indexOf(it) } }
+        }
+        val sccs = computeSCCs(nodes, ergEdges).reversed().map {
+            it.map { nodes[it] }
+        }
+
+        for(scc in sccs) {
+            // Use BVI on each SCC in reverse-topological order
+            do {
+                U = bellmanStep(goal, U, scc)
+                L = bellmanStep(goal, L, scc)
+
+                val optimalEdges = scc.associateWith {
+                    if (goal(it.owner) == OptimType.MAX) it.outEdges
+                    val edgeVals = it.outEdges.associateWith { computeEdgeValue(it, L) }
+                    val optim = edgeVals.values.minOrNull()
+                        ?: throw Exception("No out edges on node $it - use self loops for absorbing states!")
+                    it.outEdges.filter { edgeVals[it]!! - optim < msecOptimalityThreshold }
+                }
+
+                val msecs = computeMECs(optimalEdges)
+                val UDefl = U.toMutableMap()
+                for (msec in msecs) {
+                    val bestExit = msec.filter { goal(it.owner) == OptimType.MAX }.flatMap {
+                        it.outEdges.map { computeEdgeValue(it, U) }
+                    }.maxOrNull() ?: 0.0
+                    for (node in msec) {
+                        UDefl[node] = min(U[node]!!, bestExit)
+                    }
+                }
+                U = UDefl
+
+                val maxError = scc.maxOf { U[it]!! - L[it]!! }
+            } while (maxError > convThreshold)
+        }
+
+        return allNodes.associateWith { (U[it]!! + L[it]!!) / 2 }
+    }
+
+    fun TBVI(
+        goal: OptimType,
+        UInit: Map<Node, Double>,
+        LInit: Map<Node, Double>,
+        convThreshold: Double,
+    ): Map<Node, Double> {
+        this.addSelfLoops()
+        val (collapsed, nodeMap) = collapseMecs(this, goal == OptimType.MIN)
+
+        // Maps a value function on the original game to one on the collapsed game
+        // The value of a collapsed MEC is the best value among the nodes of the MEC
+        fun convertValFunction(V: Map<Node, Double>) =
+            V.entries.groupBy(
+                { nodeMap[it.key]!! }, { it.value }
+            ).mapValues { goal.select(it.value)!! }
+
+        var U = convertValFunction(UInit)
+        var L = convertValFunction(LInit)
+
+        val nodes = collapsed.allNodes
+        val ergEdges = nodes.map {
+            it.outEdges.flatMap { it.end.keys.map { nodes.indexOf(it) } }
+        }
+        val sccs = collapsed.computeSCCs(nodes, ergEdges).reversed().map {
+            it.map { nodes[it] }
+        }
+
+        for(scc in sccs) {
+            do {
+                L = collapsed.bellmanStep({ goal }, L, scc)
+                U = collapsed.bellmanStep({ goal }, U, scc)
+                val maxError = scc.maxOf { U[it]!! - L[it]!! }
+            } while (maxError > convThreshold)
+        }
+
+        val result = allNodes.associateWith { (U[nodeMap[it]]!! + L[nodeMap[it]]!!) / 2 }
+        return result
+    }
+
     private fun computeEdgeValue(e: Edge, V: Map<Node, Double>) =
-        e.end.entries.sumByDouble { (node, prob) ->
+        e.end.entries.sumOf { (node, prob) ->
             prob * (V[node] ?: throw Exception("Unknown value for node ${node}"))
         }
 

@@ -42,7 +42,8 @@ class AbstractionGameAnalysis : KoinComponent {
         errorLoc: CFA.Loc,
         finalLoc: CFA.Loc,
         nonDetGoal: OptimType,
-        useBVI: Boolean
+        useBVI: Boolean,
+        useTVI: Boolean
     ): Pair<AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>, AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>> {
 
         val (stochGame, aNodeMap, cNodeMap) = game.toStochasticGame()
@@ -64,7 +65,7 @@ class AbstractionGameAnalysis : KoinComponent {
             stochGame,
             { if (it == C) nonDetGoal else MIN },
             l0, u0,
-            convergenceThreshold, useBVI
+            convergenceThreshold, useBVI, useTVI
         )
         val minCheckResult = nonDetGoal.select(stochGame.initNodes.map { minCheckV[it]!! })!!
 
@@ -78,7 +79,7 @@ class AbstractionGameAnalysis : KoinComponent {
             stochGame,
             { if (it == C) nonDetGoal else MAX },
             linitAS, u0,
-            convergenceThreshold, useBVI
+            convergenceThreshold, useBVI, useTVI
         )
         val maxCheckResult = nonDetGoal.select(stochGame.initNodes.map { maxCheckV[it]!! })!!
 
@@ -97,7 +98,8 @@ class AbstractionGameAnalysis : KoinComponent {
         L0: Map<StochasticGame<SA, SC, LA, LC>.Node, Double>,
         U0: Map<StochasticGame<SA, SC, LA, LC>.Node, Double>,
         convergenceThreshold: Double,
-        useBVI: Boolean
+        useBVI: Boolean,
+        useTVI: Boolean
     ): Map<StochasticGame<SA, SC, LA, LC>.Node, Double> {
         val stopwatch = Stopwatch.createStarted()
 
@@ -108,7 +110,9 @@ class AbstractionGameAnalysis : KoinComponent {
         val l0 = simplifiedGame.allNodes.associateWith { invMap[it]!!.maxOf { L0[invEmbedMap[it]]!! } }
         val u0 = simplifiedGame.allNodes.associateWith { invMap[it]!!.minOf { U0[invEmbedMap[it]]!! } }
         val VIResult =
-            if (useBVI) simplifiedGame.BVI(goal, u0, l0, convergenceThreshold)
+            if (useBVI && useTVI) simplifiedGame.TBVI(goal, u0, l0, convergenceThreshold)
+            else if (useBVI) simplifiedGame.BVI(goal, u0, l0, convergenceThreshold)
+            else if (useTVI) simplifiedGame.TVI(goal, l0, convergenceThreshold)
             else simplifiedGame.VI(goal, l0, convergenceThreshold)
         val map = simplificationMap compose embedMap
 

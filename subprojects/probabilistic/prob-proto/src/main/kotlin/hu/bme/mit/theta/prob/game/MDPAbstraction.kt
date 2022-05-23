@@ -83,7 +83,7 @@ class MDPAbstractionAnalyzer : KoinComponent {
         result: (min: Double, max: Double) -> PCFACheckResult,
         precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>,
         refinableStateSelector: RefinableStateSelector,
-        useBVI: Boolean
+        useBVI: Boolean, useTVI: Boolean
     ): PCFACheckResult {
         var currPrec = initialPrec
         var iters = 0
@@ -103,7 +103,7 @@ class MDPAbstractionAnalyzer : KoinComponent {
             val game = computeGameAbstraction(init, lts, transFunc, currPrec)
 
             val (minCheckResult, maxCheckResult) =
-                abstractionGameAnalyzer.analyzeGame(game, errorLoc, finalLoc, nonDetGoal, useBVI)
+                abstractionGameAnalyzer.analyzeGame(game, errorLoc, finalLoc, nonDetGoal, useBVI, useTVI)
 
             val max = nonDetGoal.select(game.initNodes.map { maxCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
             val min = nonDetGoal.select(game.initNodes.map { minCheckResult.abstractionNodeValues[it] ?: 0.0 })!!
@@ -140,7 +140,7 @@ class MDPAbstractionAnalyzer : KoinComponent {
         nonDetGoal: OptimType, propertyThreshold: Double, thresholdType: ThresholdType,
         precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>,
         refinableStateSelector: RefinableStateSelector,
-        useBVI: Boolean
+        useBVI: Boolean, useTVI: Boolean
     ): PCFACheckResult {
         return analyze(
             transFunc,
@@ -160,7 +160,7 @@ class MDPAbstractionAnalyzer : KoinComponent {
             },
             precRefiner,
             refinableStateSelector,
-            useBVI
+            useBVI, useTVI
         )
     }
 
@@ -173,7 +173,7 @@ class MDPAbstractionAnalyzer : KoinComponent {
         nonDetGoal: OptimType, tolerance: Double,
         precRefiner: PrecRefiner<P, CfaState<S>, CfaAction, Unit>,
         refinableStateSelector: RefinableStateSelector,
-        useBVI: Boolean
+        useBVI: Boolean, useTVI: Boolean
     ): PCFACheckResult {
         return analyze(
             transFunc,
@@ -189,7 +189,7 @@ class MDPAbstractionAnalyzer : KoinComponent {
             },
             precRefiner,
             refinableStateSelector,
-            useBVI
+            useBVI, useTVI
         )
     }
 

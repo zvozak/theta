@@ -119,6 +119,9 @@ public class ProbCli {
 	@Parameter(names = "--bvi", description = "Use BVI in the abstract model analysis instead of standard VI.")
 	boolean useBvi = false;
 
+	@Parameter(names = "--tvi", description = "Use BVI in the abstract model analysis instead of standard VI.")
+	boolean useTvi = false;
+
 	@Parameter(names = "--stats", description = "Output path for stats.")
 	String statsPath = "";
 
@@ -283,6 +286,7 @@ public class ProbCli {
 				tolerance,
 				limit,
 				useBvi,
+				useTvi,
 				statsPath.isEmpty() ? () -> System.out : () -> {
 					try {
 						return new FileOutputStream(statsPath);

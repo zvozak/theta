@@ -66,6 +66,7 @@ data class PCFAConfig(
     val tolerance: Double,
     val limit: Int,
     val useBVI: Boolean,
+    val useTVI: Boolean,
 
     @kotlinx.serialization.Transient val output: ()->OutputStream = { System.out }
 ) {
@@ -117,7 +118,7 @@ fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
             transferFunction, lts, initFunc,
             initP, cfa.errorLoc.get(), cfa.finalLoc.get(),
             cfg.optimType, cfg.tolerance, precRefiner, cfg.refinableSelection.selector,
-            cfg.useBVI
+            cfg.useBVI, cfg.useTVI
         )
     } else {
         analyzer.checkThresholdProperty(
@@ -125,7 +126,7 @@ fun handlePCFA(cfa: CFA, cfg: PCFAConfig) {
             cfa.errorLoc.get(), cfa.finalLoc.get(),
             cfg.optimType, cfg.propertyThreshold, cfg.thresholdType,
             precRefiner, cfg.refinableSelection.selector,
-            cfg.useBVI
+            cfg.useBVI, cfg.useTVI
         )
     }
 
