@@ -19,7 +19,6 @@ import hu.bme.mit.theta.solver.*;
 import hu.bme.mit.theta.solver.utils.WithPushPop;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
@@ -34,6 +33,7 @@ public class ImcChecker<S extends ExprState, A extends StmtAction, P extends Pre
     private final Expr<BoolType> safetyProperty;
 
     private final Function<Valuation, S> valToState;
+    private final boolean interpolateForward;
 
     private final ItpSolver solver;
     private final int upperBound;
@@ -44,6 +44,7 @@ public class ImcChecker<S extends ExprState, A extends StmtAction, P extends Pre
                        final A transRel,
                        final Expr<BoolType> safetyProperty,
                        final Function<Valuation, S> valToState,
+                       final boolean interpolateForward,
                        final ItpSolver solver,
                        final Logger logger,
                        final int upperBound) {
@@ -52,6 +53,7 @@ public class ImcChecker<S extends ExprState, A extends StmtAction, P extends Pre
         this.transRel = transRel;
         this.safetyProperty = safetyProperty;
         this.valToState = valToState;
+        this.interpolateForward = interpolateForward;
         this.solver = solver;
         this.upperBound = upperBound;
         this.logger = logger;
@@ -62,10 +64,11 @@ public class ImcChecker<S extends ExprState, A extends StmtAction, P extends Pre
                                                                                                          final A transRel,
                                                                                                          final Expr<BoolType> safetyProperty,
                                                                                                          final Function<Valuation, S> valToState,
+                                                                                                         final boolean interpolateForward,
                                                                                                          final ItpSolver solver,
                                                                                                          final Logger logger,
                                                                                                          final int upperBound) {
-        return new ImcChecker<S, A, P>(initRel, initIndexing, transRel, safetyProperty, valToState, solver, logger, upperBound);
+        return new ImcChecker<S, A, P>(initRel, initIndexing, transRel, safetyProperty, valToState, interpolateForward, solver, logger, upperBound);
     }
 
     public static <S extends ExprState, A extends StmtAction, P extends Prec> ImcChecker<S, A, P> create(final Expr<BoolType> initRel,
@@ -73,9 +76,10 @@ public class ImcChecker<S extends ExprState, A extends StmtAction, P extends Pre
                                                                                                          final A transRel,
                                                                                                          final Expr<BoolType> safetyProperty,
                                                                                                          final Function<Valuation, S> valToState,
+                                                                                                         final boolean interpolateForward,
                                                                                                          final ItpSolver solver,
                                                                                                          final Logger logger) {
-        return new ImcChecker<S, A, P>(initRel, initIndexing, transRel, safetyProperty, valToState, solver, logger, -1);
+        return new ImcChecker<S, A, P>(initRel, initIndexing, transRel, safetyProperty, valToState, interpolateForward, solver, logger, -1);
     }
 
     @Override
@@ -109,8 +113,14 @@ public class ImcChecker<S extends ExprState, A extends StmtAction, P extends Pre
             final Expr<BoolType> foldedProperty = Not(PathUtils.unfold(safetyProperty, newIndexing));
 
             solver.push();
-            solver.add(A, And(formulas.subList(0, 2)));
-            solver.add(B, And(And(formulas.subList(2, formulas.size())), foldedProperty));
+            if(interpolateForward){
+                solver.add(A, And(formulas.subList(0, 2)));
+                solver.add(B, And(And(formulas.subList(2, formulas.size())), foldedProperty));
+            } else {
+                solver.add(B, And(formulas.subList(0, 2)));
+                solver.add(A, And(And(formulas.subList(2, formulas.size())), foldedProperty));
+            }
+
 
             Expr<BoolType> image = formulas.get(0);
 
@@ -122,8 +132,9 @@ public class ImcChecker<S extends ExprState, A extends StmtAction, P extends Pre
             }
 
             while (status.isUnsat()) {
+
                 final Interpolant interpolant = solver.getInterpolant(pattern);
-                final Expr<BoolType> itpFormula = PathUtils.unfold(PathUtils.foldin(interpolant.eval(A), indexings.get(1)), indexings.get(0));
+                final Expr<BoolType> itpFormula = PathUtils.unfold(PathUtils.foldin(interpolateForward ? interpolant.eval(A) : Not(interpolant.eval(A)), indexings.get(1)), indexings.get(0));
                 solver.pop();
 
                 try (var wpp = new WithPushPop(solver)) {
@@ -138,8 +149,13 @@ public class ImcChecker<S extends ExprState, A extends StmtAction, P extends Pre
                 image = Or(image, itpFormula);
 
                 solver.push();
-                solver.add(A, And(itpFormula, formulas.get(1)));
-                solver.add(B, And(And(formulas.subList(2, formulas.size())), foldedProperty));
+                if(interpolateForward){
+                    solver.add(A, And(itpFormula, formulas.get(1)));
+                    solver.add(B, And(And(formulas.subList(2, formulas.size())), foldedProperty));
+                } else {
+                    solver.add(B, And(itpFormula, formulas.get(1)));
+                    solver.add(A, And(And(formulas.subList(2, formulas.size())), foldedProperty));
+                }
                 status = solver.check();
             }
             solver.pop();

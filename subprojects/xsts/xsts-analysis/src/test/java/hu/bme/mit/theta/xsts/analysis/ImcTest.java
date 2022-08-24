@@ -151,7 +151,7 @@ public class ImcTest {
 		final VarIndexing initIndexing = res.getIndexing();
 
 		final StmtAction transRel = XstsAction.create(SequenceStmt.of(List.of(xsts.getEnv(), xsts.getTran())));
-		final ImcChecker<XstsState<ExplState>, StmtAction, ExplPrec> imcChecker = ImcChecker.create(initRel, initIndexing, transRel, xsts.getProp(), v -> XstsState.of(ExplState.of(v),false, true),Z3SolverFactory.getInstance().createItpSolver(), logger, 100);
+		final ImcChecker<XstsState<ExplState>, StmtAction, ExplPrec> imcChecker = ImcChecker.create(initRel, initIndexing, transRel, xsts.getProp(), v -> XstsState.of(ExplState.of(v),false, true), false, Z3SolverFactory.getInstance().createItpSolver(), logger, 100);
 		final XstsConfig<?, ?, ?> configuration = XstsConfig.create(imcChecker, ExplPrec.of(List.of()));
 
 		final SafetyResult<?, ?> status = configuration.check();

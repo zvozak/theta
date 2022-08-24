@@ -150,6 +150,9 @@ public class XstsCli {
 	@Parameter(names = "--imc", description = "Use experimental IMC algorithm")
 	boolean bmc = false;
 
+	@Parameter(names = "--itp", description = "Interpolation strategy")
+	InterpolationStrategy interpolationStrategy = InterpolationStrategy.BW;
+
 	private Logger logger;
 
 	public XstsCli(final String[] args) {
@@ -266,7 +269,7 @@ public class XstsCli {
 				final VarIndexing initIndexing = res.getIndexing();
 
 				final StmtAction transRel = XstsAction.create(SequenceStmt.of(List.of(xsts.getEnv(), xsts.getTran())));
-				final ImcChecker<XstsState<ExplState>, StmtAction, ExplPrec> imcChecker = ImcChecker.create(initRel, initIndexing, transRel, xsts.getProp(), v -> XstsState.of(ExplState.of(v),false, true), Z3SolverFactory.getInstance().createItpSolver(), logger, 100);
+				final ImcChecker<XstsState<ExplState>, StmtAction, ExplPrec> imcChecker = ImcChecker.create(initRel, initIndexing, transRel, xsts.getProp(), v -> XstsState.of(ExplState.of(v), false, true), interpolationStrategy == InterpolationStrategy.FW, Z3SolverFactory.getInstance().createItpSolver(), logger, 100);
 				return XstsConfig.create(imcChecker, initPrec.builder.createExpl(xsts));
 			} else {
 				return new XstsConfigBuilder(domain, refinement, Z3SolverFactory.getInstance())
