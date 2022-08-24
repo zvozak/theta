@@ -93,6 +93,8 @@ public class ImcChecker<S extends ExprState, A extends StmtAction, P extends Pre
         final ItpMarker B = solver.createMarker();
         final ItpPattern pattern = solver.createBinPattern(A, B);
 
+        // TODO property is not checked in initial state
+
         int currentBound = 0;
         SafetyResult<S, A> bmcresult = null;
         outerloop:
