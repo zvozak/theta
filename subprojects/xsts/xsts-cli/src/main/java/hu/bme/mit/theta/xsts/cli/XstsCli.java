@@ -9,6 +9,7 @@ import hu.bme.mit.theta.analysis.LTS;
 import hu.bme.mit.theta.analysis.Trace;
 import hu.bme.mit.theta.analysis.TransFunc;
 import hu.bme.mit.theta.analysis.algorithm.SafetyResult;
+import hu.bme.mit.theta.analysis.algorithm.Statistics;
 import hu.bme.mit.theta.analysis.algorithm.bmc.IterativeBmcChecker;
 import hu.bme.mit.theta.analysis.algorithm.cegar.CegarStatistics;
 import hu.bme.mit.theta.analysis.algorithm.runtimecheck.ArgCexCheckHandler;
@@ -61,6 +62,7 @@ import hu.bme.mit.theta.xsts.pnml.elements.PnmlNet;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -286,17 +288,26 @@ public class XstsCli {
 	}
 
 	private void printResult(final SafetyResult<?, ?> status, final XSTS sts, final long totalTimeMs) {
-		final CegarStatistics stats = (CegarStatistics) status.getStats().get();
+		final Optional<Statistics> stats = status.getStats();
 		if (benchmarkMode) {
 			writer.cell(status.isSafe());
 			writer.cell(totalTimeMs);
-			writer.cell(stats.getAlgorithmTimeMs());
-			writer.cell(stats.getAbstractorTimeMs());
-			writer.cell(stats.getRefinerTimeMs());
-			writer.cell(stats.getIterations());
-			writer.cell(status.getArg().size());
-			writer.cell(status.getArg().getDepth());
-			writer.cell(status.getArg().getMeanBranchingFactor());
+			if(stats.isPresent()){
+				final CegarStatistics cegarStatistics = (CegarStatistics) stats.get();
+				writer.cell(cegarStatistics.getAlgorithmTimeMs());
+				writer.cell(cegarStatistics.getAbstractorTimeMs());
+				writer.cell(cegarStatistics.getRefinerTimeMs());
+				writer.cell(cegarStatistics.getIterations());
+			} else {
+				writer.cells(List.of("","","",""));
+			}
+			if(status.getArg().isInitialized()){
+				writer.cell(status.getArg().size());
+				writer.cell(status.getArg().getDepth());
+				writer.cell(status.getArg().getMeanBranchingFactor());
+			} else {
+				writer.cells(List.of("","",""));
+			}
 			if (status.isUnsafe()) {
 				writer.cell(status.asUnsafe().getTrace().length() + "");
 			} else {
