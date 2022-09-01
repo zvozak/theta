@@ -454,7 +454,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
             val UDefl = U.toMutableMap()
             for (msec in msecs) {
                 val bestExit = msec.filter { goal(it.owner) == OptimType.MAX }.flatMap {
-                    it.outEdges.map { computeEdgeValue(it, U) }
+                    it.outEdges.filter { it.end.any { it.key !in msec } }.map { computeEdgeValue(it, U) }
                 }.maxOrNull() ?: 0.0
                 for (node in msec) {
                     UDefl[node] = min(U[node]!!, bestExit)
@@ -598,7 +598,7 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
                 val UDefl = U.toMutableMap()
                 for (msec in msecs) {
                     val bestExit = msec.filter { goal(it.owner) == OptimType.MAX }.flatMap {
-                        it.outEdges.map { computeEdgeValue(it, U) }
+                        it.outEdges.filter { it.end.any { it.key !in msec } }.map { computeEdgeValue(it, U) }
                     }.maxOrNull() ?: 0.0
                     for (node in msec) {
                         UDefl[node] = min(U[node]!!, bestExit)
@@ -652,26 +652,6 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
         return result
     }
 
-    private fun computeEdgeValue(e: Edge, V: Map<Node, Double>) =
-        e.end.entries.sumOf { (node, prob) ->
-            prob * (V[node] ?: throw Exception("Unknown value for node ${node}"))
-        }
-
-    private fun bellmanStep(
-        goal: (Player) -> OptimType,
-        V: Map<Node, Double>,
-        updateSet: List<Node> = allNodes
-    ): Map<Node, Double> {
-//        val VNew = hashMapOf<Node, Double>()
-        val VNew = V.toMutableMap()
-        for (node in updateSet) {
-            val edgeValues = node.outEdges.map { computeEdgeValue(it, VNew) }
-            VNew[node] = goal(node.owner).select(edgeValues)
-                ?: throw Exception("No out edges on node $node - use self loops for absorbing states!")
-        }
-        return VNew
-    }
-
     public fun VI(
         goal: (Player) -> OptimType,
         VInit: Map<Node, Double>,
@@ -706,5 +686,24 @@ open class StochasticGame<SAbs, SConc, LAbs, LConc> {
             } while (maxChange > convThreshold)
             return V
         }
+    }
+
+    fun computeEdgeValue(e: Edge, V: Map<Node, Double>) =
+        e.end.entries.sumOf { (node, prob) ->
+            prob * (V[node] ?: throw Exception("Unknown value for node ${node}"))
+        }
+
+    fun bellmanStep(
+        goal: (Player) -> OptimType,
+        V: Map<Node, Double>,
+        updateSet: List<Node> = allNodes
+    ): Map<Node, Double> {
+        val VNew = V.toMutableMap()
+        for (node in updateSet) {
+            val edgeValues = node.outEdges.map { computeEdgeValue(it, VNew) }
+            VNew[node] = goal(node.owner).select(edgeValues)
+                ?: throw Exception("No out edges on node $node - use self loops for absorbing states!")
+        }
+        return VNew
     }
 }
