@@ -28,6 +28,8 @@ include(
         "xsts/xsts-cli",
 
         "probabilistic/prob-proto",
+        "probabilistic/prob-core",
+        "probabilistic/prob-analysis",
 
         "solver/solver",
         "solver/solver-z3",

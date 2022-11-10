@@ -1,7 +1,6 @@
 package hu.bme.mit.theta.prob.game.analysis
 
 import com.google.common.base.Stopwatch
-import com.google.common.math.LongMath
 import hu.bme.mit.theta.prob.DataCollector
 import hu.bme.mit.theta.analysis.expr.ExprState
 import hu.bme.mit.theta.cfa.CFA
@@ -13,7 +12,7 @@ import hu.bme.mit.theta.prob.game.StochasticGame.Companion.Player
 import hu.bme.mit.theta.prob.game.StochasticGame.Companion.Player.C
 import hu.bme.mit.theta.prob.game.*
 import hu.bme.mit.theta.prob.game.StochasticGame.Companion.Player.A
-import javafx.scene.paint.Stop
+import hu.bme.mit.theta.prob.gbar.AbstractRewardFunction
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -43,15 +42,14 @@ class AbstractionGameAnalysis : KoinComponent {
         finalLoc: CFA.Loc,
         nonDetGoal: OptimType,
         useBVI: Boolean,
-        useTVI: Boolean
+        useTVI: Boolean,
+        convergenceThreshold: Double = 1e-12
     ): Pair<AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>, AbstractionGameCheckResult<CfaState<S>, CfaAction, Unit>> {
 
         val (stochGame, aNodeMap, cNodeMap) = game.toStochasticGame()
         val errors =
             game.stateNodes.filter { it.state.loc == errorLoc }.mapNotNull(aNodeMap::get).toSet()
         val almostSureTarget = stochGame.almostSure(C, errors)
-
-        val convergenceThreshold = 1e-8
 
         stochGame.addSelfLoops()
         val l0 = stochGame.allNodes.associateWith { 0.0 }.toMutableMap()
@@ -106,6 +104,7 @@ class AbstractionGameAnalysis : KoinComponent {
         val (embed, embedMap) = toMergedGame(game)
         val invEmbedMap = embedMap.inverse()
         val (simplifiedGame, simplificationMap) = iterativeSimplificationPass.apply(embed)
+//        val (simplifiedGame, simplificationMap) = Pair(embed, embed.allNodes.associateWith { it })
         val invMap = simplificationMap.inverseImage()
         val l0 = simplifiedGame.allNodes.associateWith { invMap[it]!!.maxOf { L0[invEmbedMap[it]]!! } }
         val u0 = simplifiedGame.allNodes.associateWith { invMap[it]!!.minOf { U0[invEmbedMap[it]]!! } }

@@ -20,6 +20,7 @@ import hu.bme.mit.theta.prob.game.analysis.AbstractionGameAnalysis
 import hu.bme.mit.theta.prob.game.analysis.OptimType
 import hu.bme.mit.theta.prob.game.analysis.argSelect
 import hu.bme.mit.theta.prob.game.analysis.select
+import hu.bme.mit.theta.prob.gbar.LocReachabilityRewardFunction
 import hu.bme.mit.theta.prob.pcfa.ProbStmt
 import hu.bme.mit.theta.prob.refinement.PrecRefiner
 import hu.bme.mit.theta.prob.refinement.RefinableStateSelector
@@ -127,6 +128,11 @@ class MDPAbstractionAnalyzer : KoinComponent {
                     minCheckResult.abstractionNodeValues, maxCheckResult.abstractionNodeValues,
                     minCheckResult.concreteChoiceNodeValues, maxCheckResult.concreteChoiceNodeValues
                 )
+                if (prevPrec == currPrec)
+                    throw java.lang.RuntimeException(
+                        "Abstraction refinement stuck :-(, " +
+                                "use a configuration with more precise post operator or better refinement"
+                    )
             }
         }
     }
