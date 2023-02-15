@@ -22,13 +22,18 @@ data class StepResult<N>(
  * Assumes that absorbing states are equipped with a self-loop instead of having no actions.
  * @return Result of the Bellman update along with the absolute value of the largest value changed.
  */
-fun <N, A> bellmanStep(game: StochasticGame<N, A>, currValues: Map<N, Double>, goal: (Int) -> Goal): StepResult<N> {
+fun <N, A> bellmanStep(
+    game: StochasticGame<N, A>,
+    currValues: Map<N, Double>,
+    goal: (Int) -> Goal,
+    discountFactor: Double = 1.0
+): StepResult<N> {
     val res = HashMap(currValues)
     var maxChange = 0.0
     for (node in game.getAllNodes()) {
         val newValue =
             // The result must always be non-null, if absorbing nodes have self-loops
-            goal(game.getPlayer(node)).select(actionValues(game, currValues, node).values)!!
+            discountFactor * goal(game.getPlayer(node)).select(actionValues(game, currValues, node).values)!!
         res[node] = newValue
         val change = abs(newValue - currValues[node]!!)
         if (change > maxChange) maxChange = change
@@ -41,13 +46,18 @@ fun <N, A> bellmanStep(game: StochasticGame<N, A>, currValues: Map<N, Double>, g
  * Assumes that absorbing states are equipped with a self-loop instead of having no actions.
  * @return Result of the Bellman update along with the absolute value of the largest value changed.
  */
-fun <N, A> bellmanStepGS(game: StochasticGame<N, A>, currValues: Map<N, Double>, goal: (Int) -> Goal): StepResult<N> {
+fun <N, A> bellmanStepGS(
+    game: StochasticGame<N, A>,
+    currValues: Map<N, Double>,
+    goal: (Int) -> Goal,
+    discountFactor: Double = 1.0
+): StepResult<N> {
     val res = HashMap(currValues)
     var maxChange = 0.0
     for (node in game.getAllNodes()) {
         val newValue =
             // The result must always be non-null, if absorbing nodes have self-loops
-            goal(game.getPlayer(node)).select(actionValues(game, res, node).values)!!
+            discountFactor * goal(game.getPlayer(node)).select(actionValues(game, res, node).values)!!
         res[node] = newValue
         val change = abs(newValue - currValues[node]!!)
         if (change > maxChange) maxChange = change

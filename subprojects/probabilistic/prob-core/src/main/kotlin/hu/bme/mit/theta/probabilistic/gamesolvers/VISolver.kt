@@ -23,8 +23,8 @@ class VISolver<N, A>(
         var curr = init
         do {
             val stepResult =
-                if(useGS) bellmanStepGS(game, curr, goal)
-                else bellmanStep(game, curr, goal)
+                if(useGS) bellmanStepGS(game, curr, goal, analysisTask.discountFactor)
+                else bellmanStep(game, curr, goal, analysisTask.discountFactor)
             val maxChange = stepResult.maxChange
             curr = stepResult.result
         } while (maxChange > tolerance)

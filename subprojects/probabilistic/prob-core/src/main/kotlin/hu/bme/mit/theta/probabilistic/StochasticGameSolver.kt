@@ -14,7 +14,8 @@ fun setGoal(vararg mapping: Pair<Int, Goal>): ((Int)-> Goal) {
 
 class AnalysisTask<N, A>(
     val game: StochasticGame<N, A>,
-    val goal: (Int) -> Goal
+    val goal: (Int) -> Goal,
+    val discountFactor: Double = 1.0
 )
 
 interface StochasticGameSolver<N, A> {

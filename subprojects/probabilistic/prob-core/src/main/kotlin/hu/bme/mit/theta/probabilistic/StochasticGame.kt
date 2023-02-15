@@ -28,7 +28,7 @@ interface StochasticGame<N, A> {
                 val result = getResult(curr, act)
                 for (n in result.support) {
                     if(!nodeMapping.containsKey(n)) {
-                        nodeMapping[n] = addNode(n.toString(), getPlayer(curr))
+                        nodeMapping[n] = addNode(n.toString(), getPlayer(n))
                         q.add(n)
                     }
                 }

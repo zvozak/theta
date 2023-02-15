@@ -39,6 +39,9 @@ class EnumeratedDistribution<D>(
         return pmf.hashCode()
     }
 
+    override fun toString(): String {
+        return "D$($pmf)"
+    }
 
     companion object {
         fun <D> dirac(d: D) = EnumeratedDistribution(d to 1.0)

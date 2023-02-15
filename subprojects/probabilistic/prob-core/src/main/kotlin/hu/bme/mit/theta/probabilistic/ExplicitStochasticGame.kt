@@ -73,11 +73,13 @@ class ExplicitStochasticGame private constructor(
 
     fun visualize(targets: Collection<Node>): Graph {
         val g = Graph("Game", "Game")
+        var nodeId = 0
+        val idMap = nodes.associateWith { nodeId++ }
         for (node in nodes) {
             val attrBuilder = NodeAttributes.builder()
                 .label("[${node.player}] ${node.name}")
             if(node in targets) attrBuilder.fillColor(Color.RED)
-            g.addNode(node.name, attrBuilder.build())
+            g.addNode("n${idMap[node]}", attrBuilder.build())
         }
 
         var nextAuxId = 0
@@ -85,7 +87,11 @@ class ExplicitStochasticGame private constructor(
             val attrBuilder = EdgeAttributes.builder()
                 .label(edge.label)
             if (edge.end.support.size == 1) {
-                g.addEdge(edge.start.name, edge.end.support.first().name, attrBuilder.build())
+                g.addEdge(
+                    "n${idMap[edge.start]}",
+                    "n${idMap[edge.end.support.first()]}",
+                    attrBuilder.build()
+                )
             } else {
                 val auxId = "_AUX${nextAuxId++}"
                 g.addNode(
@@ -95,10 +101,10 @@ class ExplicitStochasticGame private constructor(
                         .fillColor(Color.GRAY)
                         .build()
                 )
-                g.addEdge(edge.start.name, auxId, attrBuilder.build())
+                g.addEdge("n${idMap[edge.start]}", auxId, attrBuilder.build())
                 for (n in edge.end.support) {
                     val prob = edge.end[n]
-                    g.addEdge(auxId, n.name, EdgeAttributes.builder().label(prob.toString()).build())
+                    g.addEdge(auxId, "n${idMap[n]}", EdgeAttributes.builder().label(prob.toString()).build())
                 }
             }
         }
