@@ -17,6 +17,7 @@ package hu.bme.mit.theta.core.utils;
 
 import hu.bme.mit.theta.core.decl.Decl;
 import hu.bme.mit.theta.core.decl.IndexedConstDecl;
+import hu.bme.mit.theta.core.decl.MultiIndexedConstDecl;
 import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.anytype.RefExpr;
 
@@ -33,7 +34,8 @@ final class ExprIndexedVarCollector {
 				final IndexedConstDecl<?> indexedConstDecl = (IndexedConstDecl<?>) decl;
 				builder.add(indexedConstDecl);
 				return;
-			}
+			} else if(decl instanceof MultiIndexedConstDecl)
+				throw new IllegalArgumentException("collectIndexedVars should not be used on multi-indexed const decls");
 		}
 
 		expr.getOps().stream().forEach(op -> collectIndexedVars(op, builder));

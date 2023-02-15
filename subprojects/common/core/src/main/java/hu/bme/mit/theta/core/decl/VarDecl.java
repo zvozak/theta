@@ -19,6 +19,8 @@ import hu.bme.mit.theta.common.Utils;
 import hu.bme.mit.theta.core.type.Type;
 
 import hu.bme.mit.theta.common.container.Containers;
+
+import java.util.List;
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -34,10 +36,12 @@ public final class VarDecl<DeclType extends Type> extends Decl<DeclType> {
 	private static final String DECL_LABEL = "var";
 
 	private final Map<Integer, IndexedConstDecl<DeclType>> indexToConst;
+	private final Map<List<Integer>, MultiIndexedConstDecl<DeclType>> indicesToConst;
 
 	VarDecl(final String name, final DeclType type) {
 		super(name, type);
 		indexToConst = Containers.createMap();
+		indicesToConst = Containers.createMap();
 	}
 
 	public static <DeclType extends Type> VarDecl<DeclType> copyOf(VarDecl<DeclType> from) {
@@ -50,6 +54,17 @@ public final class VarDecl<DeclType extends Type> extends Decl<DeclType> {
 		if (constDecl == null) {
 			constDecl = new IndexedConstDecl<>(this, index);
 			indexToConst.put(index, constDecl);
+		}
+		return constDecl;
+	}
+
+	public MultiIndexedConstDecl<DeclType> getConstDecl(final List<Integer> index) {
+		checkArgument(index.size() > 1, "Multi-indexed constants must have at least two indices");
+		checkArgument(index.stream().allMatch((i) -> i >= 0));
+		MultiIndexedConstDecl<DeclType> constDecl = indicesToConst.get(index);
+		if (constDecl == null) {
+			constDecl = new MultiIndexedConstDecl<>(this, index);
+			indicesToConst.put(index, constDecl);
 		}
 		return constDecl;
 	}

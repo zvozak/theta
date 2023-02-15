@@ -15,10 +15,7 @@
  */
 package hu.bme.mit.theta.core.utils;
 
-import hu.bme.mit.theta.core.decl.ConstDecl;
-import hu.bme.mit.theta.core.decl.Decl;
-import hu.bme.mit.theta.core.decl.IndexedConstDecl;
-import hu.bme.mit.theta.core.decl.VarDecl;
+import hu.bme.mit.theta.core.decl.*;
 import hu.bme.mit.theta.core.model.ImmutableValuation;
 import hu.bme.mit.theta.core.model.Valuation;
 import hu.bme.mit.theta.core.type.Expr;
@@ -239,7 +236,8 @@ public class PathUtils {
 					} else {
 						return Prime(varRef, nPrimes);
 					}
-				}
+				} else if(decl instanceof MultiIndexedConstDecl)
+					throw new IllegalArgumentException("Foldin should not be used with multi-indexed constants");
 			}
 
 			return expr.map(this::foldin);
