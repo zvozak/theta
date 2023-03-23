@@ -14,10 +14,9 @@ import hu.bme.mit.theta.core.model.Valuation
 import hu.bme.mit.theta.core.stmt.Stmts.Assume
 import hu.bme.mit.theta.core.stmt.Stmts.SequenceStmt
 import hu.bme.mit.theta.core.type.Expr
-import hu.bme.mit.theta.core.type.booltype.BoolExprs.*
+import hu.bme.mit.theta.core.type.booltype.SmartBoolExprs.*
 import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.type.booltype.FalseExpr
-import hu.bme.mit.theta.core.type.booltype.SmartBoolExprs
 import hu.bme.mit.theta.core.type.booltype.TrueExpr
 import hu.bme.mit.theta.core.utils.ExprUtils
 import hu.bme.mit.theta.core.utils.PathUtils
@@ -26,8 +25,8 @@ import hu.bme.mit.theta.core.utils.indexings.VarIndexing
 import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
 import hu.bme.mit.theta.prob.analysis.addNewIndexToNonZero
 import hu.bme.mit.theta.prob.analysis.extractMultiIndexValuation
-import hu.bme.mit.theta.probabilistic.EnumeratedDistribution
-import hu.bme.mit.theta.probabilistic.EnumeratedDistribution.Companion.dirac
+import hu.bme.mit.theta.probabilistic.FiniteDistribution
+import hu.bme.mit.theta.probabilistic.FiniteDistribution.Companion.dirac
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 
@@ -43,7 +42,7 @@ class ExplProbabilisticCommandTransFunc(
 
     override fun getNextStates(
         state: ExplState, command: ProbabilisticCommand<StmtAction>, prec: ExplPrec
-    ): Collection<EnumeratedDistribution<ExplState>> {
+    ): Collection<FiniteDistribution<ExplState>> {
         val valuation = state.`val`
         val substitutedGuard = PathUtils.unfold(ExprUtils.simplify(command.guard, valuation),0)
 
@@ -84,9 +83,9 @@ class ExplProbabilisticCommandTransFunc(
         // only assignment-like statements, but better safe than sorry
         if (stmtApplicationResults.contains(ApplyResult.BOTTOM)) return listOf(dirac(bottom()))
 
-        val targetIndexing = hashMapOf<Expr<BoolType>, VarIndexing>()
         var i = 0
         val auxIndex = hashMapOf<Expr<BoolType>, Int>()
+        val targetIndexing = hashMapOf<Expr<BoolType>, VarIndexing>()
         val resultExprDistr = command.result.transform {
             val stmtUnfoldResult =
                 StmtUtils.toExpr(it.stmts, VarIndexingFactory.indexing(0))
@@ -106,7 +105,7 @@ class ExplProbabilisticCommandTransFunc(
             return@transform multiIndexedExpr
         }
 
-        val results = arrayListOf<EnumeratedDistribution<ExplState>>()
+        val results = arrayListOf<FiniteDistribution<ExplState>>()
         WithPushPop(solver).use {
             solver.add(PathUtils.unfold(And(state.toExpr(), command.guard), 0))
             solver.add(And(resultExprDistr.support))

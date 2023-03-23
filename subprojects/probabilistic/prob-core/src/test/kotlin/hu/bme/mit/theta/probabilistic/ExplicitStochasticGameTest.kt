@@ -11,9 +11,9 @@ class ExplicitStochasticGameTest {
         val s1 = gameBuilder.addNode("s1", 0)
         val s2 = gameBuilder.addNode("s2", 1)
         val s3 = gameBuilder.addNode("s3", 0)
-        gameBuilder.addEdge(s1, EnumeratedDistribution(s1 to 0.2, s2 to 0.8))
-        gameBuilder.addEdge(s1, EnumeratedDistribution(s2 to 0.3, s3 to 0.7))
-        gameBuilder.addEdge(s2, EnumeratedDistribution(s3 to 1.0))
+        gameBuilder.addEdge(s1, FiniteDistribution(s1 to 0.2, s2 to 0.8))
+        gameBuilder.addEdge(s1, FiniteDistribution(s2 to 0.3, s3 to 0.7))
+        gameBuilder.addEdge(s2, FiniteDistribution(s3 to 1.0))
         gameBuilder.setInitNode(s1)
         val game = gameBuilder.build().game
 
@@ -27,8 +27,8 @@ class ExplicitStochasticGameTest {
         val actions = game.getAvailableActions(s1Node)
         val results = actions.map { act -> game.getResult(s1Node, act) }
 
-        results.contains(EnumeratedDistribution(s1Node to 0.2, s2Node to 0.8))
-        results.contains(EnumeratedDistribution(s2Node to 0.3, s3Node to 0.7))
+        results.contains(FiniteDistribution(s1Node to 0.2, s2Node to 0.8))
+        results.contains(FiniteDistribution(s2Node to 0.3, s3Node to 0.7))
     }
 
     @Test
@@ -42,9 +42,9 @@ class ExplicitStochasticGameTest {
                 else (0..(10-node)).toList()
             }
 
-            override fun getResult(node: Int, action: Int): EnumeratedDistribution<Int> {
-                if(node+action == 0) return EnumeratedDistribution(0 to 1.0)
-                return EnumeratedDistribution(0 to 0.2, node+action to 0.8)
+            override fun getResult(node: Int, action: Int): FiniteDistribution<Int> {
+                if(node+action == 0) return FiniteDistribution(0 to 1.0)
+                return FiniteDistribution(0 to 0.2, node+action to 0.8)
             }
 
             override fun getPlayer(node: Int): Int {

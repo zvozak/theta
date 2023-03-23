@@ -7,8 +7,9 @@ import hu.bme.mit.theta.core.decl.Decls
 import hu.bme.mit.theta.core.stmt.Stmts
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
 import hu.bme.mit.theta.core.type.inttype.IntExprs
-import hu.bme.mit.theta.probabilistic.EnumeratedDistribution
-import hu.bme.mit.theta.probabilistic.EnumeratedDistribution.Companion.dirac
+import hu.bme.mit.theta.prob.analysis.toAction
+import hu.bme.mit.theta.probabilistic.FiniteDistribution
+import hu.bme.mit.theta.probabilistic.FiniteDistribution.Companion.dirac
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
 import org.junit.Assert
@@ -41,7 +42,7 @@ class ExplProbabilisticCommandTransFuncMultiEnumTest {
         )
 
         val command = ProbabilisticCommand<StmtAction>(
-            guard, EnumeratedDistribution(
+            guard, FiniteDistribution(
                 Stmts.Assign(A, IntExprs.Add(A.ref, C.ref)).toAction() to 0.2,
                 Stmts.Assign(A, IntExprs.Int(1)).toAction() to 0.8
             )
@@ -54,7 +55,7 @@ class ExplProbabilisticCommandTransFuncMultiEnumTest {
         val expected = setOf(
             dirac(ExplState.bottom()),
             dirac(createState(A to 1, B to 1)),
-            EnumeratedDistribution(
+            FiniteDistribution(
                 createState(A to 2, B to 1) to 0.2,
                 createState(A to 1, B to 1) to 0.8
             )

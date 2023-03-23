@@ -15,21 +15,21 @@ fun treeGame(): TestInput {
     builder.setInitNode(a)
 
     val b = builder.addNode("b", 1)
-    builder.addEdge(a, EnumeratedDistribution(b to 1.0))
+    builder.addEdge(a, FiniteDistribution(b to 1.0))
 
     val c1 = builder.addNode("c1", 0)
     val c2 = builder.addNode("c2", 0)
-    builder.addEdge(b, EnumeratedDistribution(c1 to 1.0))
-    builder.addEdge(b, EnumeratedDistribution(c2 to 1.0))
+    builder.addEdge(b, FiniteDistribution(c1 to 1.0))
+    builder.addEdge(b, FiniteDistribution(c2 to 1.0))
 
     val d11 = builder.addNode("d11", 1)
     val d12 = builder.addNode("d12", 1)
     val d21 = builder.addNode("d21", 1)
     val d22 = builder.addNode("d22", 1)
-    builder.addEdge(c1, EnumeratedDistribution(d11 to 1.0))
-    builder.addEdge(c1, EnumeratedDistribution(d12 to 1.0))
-    builder.addEdge(c2, EnumeratedDistribution(d21 to 1.0))
-    builder.addEdge(c2, EnumeratedDistribution(d22 to 1.0))
+    builder.addEdge(c1, FiniteDistribution(d11 to 1.0))
+    builder.addEdge(c1, FiniteDistribution(d12 to 1.0))
+    builder.addEdge(c2, FiniteDistribution(d21 to 1.0))
+    builder.addEdge(c2, FiniteDistribution(d22 to 1.0))
 
     val e111 = builder.addNode("e111", 0)
     val e112 = builder.addNode("e112", 0)
@@ -39,10 +39,10 @@ fun treeGame(): TestInput {
     val e212 = builder.addNode("e212", 0)
     val e221 = builder.addNode("e221", 0)
     val e222 = builder.addNode("e222", 0)
-    builder.addEdge(d11, EnumeratedDistribution(e111 to 0.1, e112 to 0.9))
-    builder.addEdge(d12, EnumeratedDistribution(e121 to 0.2, e122 to 0.8))
-    builder.addEdge(d21, EnumeratedDistribution(e211 to 0.3, e212 to 0.7))
-    builder.addEdge(d22, EnumeratedDistribution(e221 to 0.4, e222 to 0.6))
+    builder.addEdge(d11, FiniteDistribution(e111 to 0.1, e112 to 0.9))
+    builder.addEdge(d12, FiniteDistribution(e121 to 0.2, e122 to 0.8))
+    builder.addEdge(d21, FiniteDistribution(e211 to 0.3, e212 to 0.7))
+    builder.addEdge(d22, FiniteDistribution(e221 to 0.4, e222 to 0.6))
 
     builder.addSelfLoops()
 
@@ -79,8 +79,8 @@ fun ringGame(): TestInput {
     }
     for (i in 0 until size) {
         val nextRingNode = ringNodes[(i + 1) % size]
-        builder.addEdge(ringNodes[i], EnumeratedDistribution(nextRingNode to 0.1, outerNodes[i] to 0.9))
-        builder.addEdge(ringNodes[i], EnumeratedDistribution.dirac(nextRingNode))
+        builder.addEdge(ringNodes[i], FiniteDistribution(nextRingNode to 0.1, outerNodes[i] to 0.9))
+        builder.addEdge(ringNodes[i], FiniteDistribution.dirac(nextRingNode))
     }
     builder.setInitNode(ringNodes.first())
     builder.addSelfLoops()

@@ -1,6 +1,6 @@
 package hu.bme.mit.theta.probabilistic
 
-class EnumeratedDistribution<D>(
+class FiniteDistribution<D>(
     _pmf: Map<D, Double>
 ) {
     init {
@@ -15,20 +15,20 @@ class EnumeratedDistribution<D>(
     val support get() = pmf.keys
 
     fun expectedValue(f: (D)->Double) = pmf.entries.sumByDouble { it.value*f(it.key) }
-    fun <E> transform(f: (D)->E): EnumeratedDistribution<E> {
+    fun <E> transform(f: (D)->E): FiniteDistribution<E> {
         val result = hashMapOf<E, Double>()
         for ((k, v) in pmf) {
             val kk = f(k)
             result[kk] = result.getOrDefault(kk, 0.0) + v
         }
-        return EnumeratedDistribution(result)
+        return FiniteDistribution(result)
     }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
 
-        other as EnumeratedDistribution<*>
+        other as FiniteDistribution<*>
 
         if (pmf != other.pmf) return false
 
@@ -44,6 +44,6 @@ class EnumeratedDistribution<D>(
     }
 
     companion object {
-        fun <D> dirac(d: D) = EnumeratedDistribution(d to 1.0)
+        fun <D> dirac(d: D) = FiniteDistribution(d to 1.0)
     }
 }

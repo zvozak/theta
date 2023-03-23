@@ -36,7 +36,7 @@ abstract class ImplicitStochasticGame<N, A>: StochasticGame<N, A> {
 
     abstract override fun getPlayer(node: N): Int
 
-    abstract override fun getResult(node: N, action: A): EnumeratedDistribution<N>
+    abstract override fun getResult(node: N, action: A): FiniteDistribution<N>
 
     abstract override fun getAvailableActions(node: N): Collection<A>
 

@@ -2,6 +2,8 @@ package hu.bme.mit.theta.prob.analysis.menuabstraction
 
 import hu.bme.mit.theta.analysis.expl.ExplState
 import hu.bme.mit.theta.analysis.expr.StmtAction
+import hu.bme.mit.theta.analysis.pred.PredState
+import hu.bme.mit.theta.core.decl.Decl
 import hu.bme.mit.theta.core.decl.VarDecl
 import hu.bme.mit.theta.core.model.ImmutableValuation
 import hu.bme.mit.theta.core.stmt.AssumeStmt
@@ -9,20 +11,11 @@ import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
 import hu.bme.mit.theta.core.type.booltype.BoolType
-import hu.bme.mit.theta.core.type.booltype.SmartBoolExprs
 import hu.bme.mit.theta.core.type.booltype.SmartBoolExprs.And
 import hu.bme.mit.theta.core.type.inttype.IntExprs
 import hu.bme.mit.theta.core.type.inttype.IntType
-import hu.bme.mit.theta.probabilistic.EnumeratedDistribution
-
-class BasicStmtAction(private val _stmts: List<Stmt>) : StmtAction() {
-    override fun getStmts(): List<Stmt> = _stmts
-    override fun toString(): String {
-        return _stmts.toString()
-    }
-}
-
-fun Stmt.toAction() = BasicStmtAction(listOf(this))
+import hu.bme.mit.theta.prob.analysis.toAction
+import hu.bme.mit.theta.probabilistic.FiniteDistribution
 
 fun createState(vararg v: Pair<VarDecl<IntType>, Int>): ExplState {
     val builder = ImmutableValuation.builder()
@@ -40,6 +33,9 @@ fun createBoolState(vararg v: Pair<VarDecl<BoolType>, Boolean>): ExplState {
     return ExplState.of(builder.build())
 }
 
+fun createPredState(vararg v: Expr<BoolType>) =
+    PredState.of(v.toList())
+
 fun constrainRange(vararg constraints: Pair<VarDecl<IntType>, Pair<Int, Int>>): AssumeStmt {
     val expr = And(
         constraints.map {
@@ -54,5 +50,5 @@ fun constrainRange(vararg constraints: Pair<VarDecl<IntType>, Pair<Int, Int>>): 
 }
 
 fun Expr<BoolType>.then(vararg results: Pair<Double, Stmt>) = ProbabilisticCommand<StmtAction>(
-    this, EnumeratedDistribution(results.associate { it.second.toAction() to it.first })
+    this, FiniteDistribution(results.associate { it.second.toAction() to it.first })
 )

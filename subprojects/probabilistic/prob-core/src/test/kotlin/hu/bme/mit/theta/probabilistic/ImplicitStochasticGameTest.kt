@@ -14,9 +14,9 @@ class ImplicitStochasticGameTest {
             else (0..(10-node)).toList()
         }
 
-        override fun getResult(node: Int, action: Int): EnumeratedDistribution<Int> {
-            if(node+action == 0) return EnumeratedDistribution(0 to 1.0)
-            return EnumeratedDistribution(0 to 0.2, node+action to 0.8)
+        override fun getResult(node: Int, action: Int): FiniteDistribution<Int> {
+            if(node+action == 0) return FiniteDistribution(0 to 1.0)
+            return FiniteDistribution(0 to 0.2, node+action to 0.8)
         }
 
         override fun getPlayer(node: Int): Int {

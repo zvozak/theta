@@ -1,5 +1,6 @@
 package hu.bme.mit.theta.probabilistic.gamesolvers
 
+import hu.bme.mit.theta.probabilistic.GameRewardFunction
 import hu.bme.mit.theta.probabilistic.Goal
 import hu.bme.mit.theta.probabilistic.StochasticGame
 import hu.bme.mit.theta.probabilistic.equals
@@ -20,20 +21,24 @@ data class StepResult<N>(
 /**
  * Computes the standard Bellman update in a stochastic game, and returns a new map with the new values.
  * Assumes that absorbing states are equipped with a self-loop instead of having no actions.
+ * @param gaussSeidel Specifies whether the already updated neighbour values should be used (Gauss-Seidel VI, true),
+ *  or the original values (standard VI, false)
  * @return Result of the Bellman update along with the absolute value of the largest value changed.
  */
 fun <N, A> bellmanStep(
     game: StochasticGame<N, A>,
     currValues: Map<N, Double>,
     goal: (Int) -> Goal,
-    discountFactor: Double = 1.0
+    discountFactor: Double = 1.0,
+    gaussSeidel: Boolean = false
 ): StepResult<N> {
     val res = HashMap(currValues)
+    val v = if(gaussSeidel) res else currValues
     var maxChange = 0.0
     for (node in game.getAllNodes()) {
         val newValue =
             // The result must always be non-null, if absorbing nodes have self-loops
-            discountFactor * goal(game.getPlayer(node)).select(actionValues(game, currValues, node).values)!!
+            discountFactor * goal(game.getPlayer(node)).select(actionValues(game, v, node).values)!!
         res[node] = newValue
         val change = abs(newValue - currValues[node]!!)
         if (change > maxChange) maxChange = change
@@ -42,22 +47,27 @@ fun <N, A> bellmanStep(
 }
 
 /**
- * Bellman step for Gauss-Seidel VI: when computing updates for nodes, the new values are used for already updated neighbors
- * Assumes that absorbing states are equipped with a self-loop instead of having no actions.
+ * Computes the standard Bellman update in a stochastic game, and returns a new map with the new values.
+ * States meant to be absorbing must not be equipped with self-loops as it results in infinite reward.
+ * @param gaussSeidel Specifies whether the already updated neighbour values should be used (Gauss-Seidel VI, true),
+ *  or the original values (standard VI, false)
  * @return Result of the Bellman update along with the absolute value of the largest value changed.
  */
-fun <N, A> bellmanStepGS(
+fun <N, A> bellmanStep(
     game: StochasticGame<N, A>,
     currValues: Map<N, Double>,
     goal: (Int) -> Goal,
-    discountFactor: Double = 1.0
+    rewardFunction: GameRewardFunction<N, A>,
+    discountFactor: Double = 1.0,
+    gaussSeidel: Boolean = false
 ): StepResult<N> {
     val res = HashMap(currValues)
+    val v = if(gaussSeidel) res else currValues
     var maxChange = 0.0
     for (node in game.getAllNodes()) {
         val newValue =
-            // The result must always be non-null, if absorbing nodes have self-loops
-            discountFactor * goal(game.getPlayer(node)).select(actionValues(game, res, node).values)!!
+            rewardFunction.getStateReward(node) +
+            discountFactor * (goal(game.getPlayer(node)).select(actionValues(game, v, node, rewardFunction).values) ?: 0.0)
         res[node] = newValue
         val change = abs(newValue - currValues[node]!!)
         if (change > maxChange) maxChange = change
@@ -71,8 +81,20 @@ fun <N, A> bellmanStepGS(
 fun <N, A> actionValues(game: StochasticGame<N, A>, nodeValues: Map<N, Double>, node: N): Map<A, Double> {
     return game.getAvailableActions(node)
         .associateWith { act ->
+            game.getResult(node, act).expectedValue { n -> nodeValues.getOrDefault(n, 0.0) }
+        }
+}
+
+/**
+ * Computes the expected value of taking an action in a node for each available action in the node.
+ */
+fun <N, A> actionValues(game: StochasticGame<N, A>, nodeValues: Map<N, Double>, node: N, rewardFunction: GameRewardFunction<N, A>): Map<A, Double> {
+    return game.getAvailableActions(node)
+        .associateWith { act ->
             game.getResult(node, act)
-                .expectedValue { n -> nodeValues.getOrDefault(n, 0.0) }
+                .expectedValue { n ->
+                    nodeValues.getOrDefault(n, 0.0) + rewardFunction.getEdgeReward(node, act, n)
+                }
         }
 }
 
@@ -108,6 +130,46 @@ fun <N, A> deflate(
         } + msec.mapNotNull { lowerValues[it] } // Used so that we do not deflate lower than the currently known lower approximation
                 ).maxOrNull() ?: 0.0
         for (node in msec) {
+            if (res[node]!! > bestExit) res[node] = bestExit
+        }
+    }
+    return res
+}
+
+/**
+ * Computes the deflation step of BVI.
+ * See Kelmendi et. al.: Value Iteration for Simple Stochastic Games: Stopping Criterion and Learning Algorithm
+ * for details.
+ * @param upperValues The values to deflate
+ * @param lowerValues The values to base dynamic MSEC computation on
+ */
+fun <N, A> deflate(
+    game: StochasticGame<N, A>,
+    upperValues: Map<N, Double>,
+    lowerValues: Map<N, Double>,
+    goal: (Int) -> Goal,
+    rewardFunction: GameRewardFunction<N, A>,
+    msecOptimalityThreshold: Double = 1e-18
+): Map<N, Double> {
+    val optimalActions = game.getAllNodes().associateWith { n ->
+        if (goal(game.getPlayer(n)) == Goal.MAX) game.getAvailableActions(n)
+        else {
+            val vals = actionValues(game, lowerValues, n)
+            val optim = vals.values.minOrNull()
+                ?: throw Exception("No out edges on node $n - use self loops for absorbing states!")
+            game.getAvailableActions(n).filter { vals[it]!!.equals(optim, msecOptimalityThreshold) }
+        }
+    }
+    val msecs = computeMECs(game) { optimalActions.get(it)!! }
+    val res = upperValues.toMutableMap()
+    for (msec in msecs) {
+        val bestExit = (msec.filter { goal(game.getPlayer(it)) == Goal.MAX }.flatMap { n ->
+            game.getAvailableActions(n).map { act -> game.getResult(n, act) }.filter { it.support.any { it !in msec } }
+                .map { it.expectedValue { upperValues[it]!! } }
+        } + msec.mapNotNull { lowerValues[it] } // Used so that we do not deflate lower than the currently known lower approximation
+                ).maxOrNull() ?: 0.0
+        for (node in msec) {
+            TODO("rewards")
             if (res[node]!! > bestExit) res[node] = bestExit
         }
     }
@@ -262,4 +324,11 @@ fun computeSCCs(
     }
 
     return SCCs
+}
+fun tarjan() {
+    TODO()
+}
+
+fun ndfs() {
+    TODO()
 }

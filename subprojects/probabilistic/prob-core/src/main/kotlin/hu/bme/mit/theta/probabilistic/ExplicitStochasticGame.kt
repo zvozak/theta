@@ -16,7 +16,7 @@ class ExplicitStochasticGame private constructor(
 ): StochasticGame<ExplicitStochasticGame.Node, ExplicitStochasticGame.Edge> {
     inner class Edge(
         val start: Node,
-        val end: EnumeratedDistribution<Node>,
+        val end: FiniteDistribution<Node>,
         val label: String = ""
     )
     inner class Node(
@@ -60,7 +60,7 @@ class ExplicitStochasticGame private constructor(
     override fun getResult(
         node: Node,
         action: Edge
-    ): EnumeratedDistribution<Node> = action.end
+    ): FiniteDistribution<Node> = action.end
 
     override fun getAvailableActions(node: Node): Collection<Edge> =
         outgoingEdges[node]!!
@@ -116,7 +116,7 @@ class ExplicitStochasticGame private constructor(
         val idx = nodes.withIndex().associate { (idx, n) -> n to idx }
         val numPlayers = nodes.maxOf { it.player }
 
-        fun distrString(distr: EnumeratedDistribution<Node>): String {
+        fun distrString(distr: FiniteDistribution<Node>): String {
             return distr.support.map { "${distr[it]} : s'=${idx[it]}" }.joinToString { " + " }
         }
 
@@ -148,7 +148,7 @@ class ExplicitStochasticGame private constructor(
 
     class Builder {
         class Node(val name: String="", val player: Int)
-        class Edge(val start: Node, val end: EnumeratedDistribution<Node>, val label: String = "")
+        class Edge(val start: Node, val end: FiniteDistribution<Node>, val label: String = "")
 
         private val preNodes = arrayListOf<Node>()
         private val preEdges = arrayListOf<Edge>()
@@ -164,7 +164,7 @@ class ExplicitStochasticGame private constructor(
             return Node(name, player).apply(preNodes::add)
         }
 
-        fun addEdge(start: Node, end: EnumeratedDistribution<Node>, label: String = "") =
+        fun addEdge(start: Node, end: FiniteDistribution<Node>, label: String = "") =
             Edge(start, end, label).apply(preEdges::add)
 
         fun setInitNode(node: Node) {initialNode = node}
@@ -177,7 +177,7 @@ class ExplicitStochasticGame private constructor(
         fun addSelfLoops() {
             for (node in preNodes) {
                 if(preEdges.none { it.start == node })
-                    addEdge(node, EnumeratedDistribution(node to 1.0))
+                    addEdge(node, FiniteDistribution(node to 1.0))
             }
         }
 

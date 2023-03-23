@@ -4,29 +4,31 @@ import hu.bme.mit.theta.analysis.expl.ExplPrec
 import hu.bme.mit.theta.analysis.expl.ExplState
 import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.core.decl.Decls
-import hu.bme.mit.theta.core.decl.VarDecl
-import hu.bme.mit.theta.core.model.ImmutableValuation
-import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.core.stmt.Stmts
-import hu.bme.mit.theta.core.type.booltype.BoolExprs
 import hu.bme.mit.theta.core.type.booltype.BoolExprs.*
-import hu.bme.mit.theta.core.type.booltype.BoolType
-import hu.bme.mit.theta.core.type.inttype.IntExprs
 import hu.bme.mit.theta.core.type.inttype.IntExprs.*
-import hu.bme.mit.theta.core.type.inttype.IntType
-import hu.bme.mit.theta.probabilistic.EnumeratedDistribution
-import hu.bme.mit.theta.probabilistic.EnumeratedDistribution.Companion.dirac
+import hu.bme.mit.theta.prob.analysis.toAction
+import hu.bme.mit.theta.probabilistic.FiniteDistribution
+import hu.bme.mit.theta.probabilistic.FiniteDistribution.Companion.dirac
+import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class ExplProbabilisticCommandTransFuncFullEnumTest {
 
+    lateinit var solver: Solver
+    lateinit var transFunc: ExplProbabilisticCommandTransFunc
+
+    @Before
+    fun initEach() {
+        solver = Z3SolverFactory.getInstance().createSolver()
+        transFunc = ExplProbabilisticCommandTransFunc(0, solver)
+    }
+
     @Test
     fun simpleDeterministicCommandFullEnumTest() {
-        val solver = Z3SolverFactory.getInstance().createSolver()
-        val transFunc = ExplProbabilisticCommandTransFunc(0, solver)
-
         val A = Decls.Var("A", Int())
 
         val command = ProbabilisticCommand<StmtAction>(
@@ -66,14 +68,11 @@ class ExplProbabilisticCommandTransFuncFullEnumTest {
     }
 
     @Test
-    fun simpleProbCommandFullEnumTest() {
-        val solver = Z3SolverFactory.getInstance().createSolver()
-        val transFunc = ExplProbabilisticCommandTransFunc(0, solver)
-
+    fun simpleProbCommandTest() {
         val A = Decls.Var("A", Int())
 
         val command = ProbabilisticCommand<StmtAction>(
-            True(), EnumeratedDistribution(
+            True(), FiniteDistribution(
                 mapOf(
                     Stmts.Assign(A, Add(A.ref, Int(1))).toAction() to 0.2,
                     Stmts.Assign(A, Add(A.ref, Int(2))).toAction() to 0.8,
@@ -85,16 +84,13 @@ class ExplProbabilisticCommandTransFuncFullEnumTest {
 
         val nexts1 = transFunc.getNextStates(stateA, command, ExplPrec.of(listOf(A)))
         val expected1 = listOf(
-            EnumeratedDistribution(createState(A to 1) to 0.2, createState(A to 2) to 0.8)
+            FiniteDistribution(createState(A to 1) to 0.2, createState(A to 2) to 0.8)
         )
         assertEquals(expected1, nexts1)
     }
 
     @Test
     fun simpleMultiResultDeterministicCommandFullEnumTest() {
-        val solver = Z3SolverFactory.getInstance().createSolver()
-        val transFunc = ExplProbabilisticCommandTransFunc(0, solver)
-
         val A = Decls.Var("A", Bool())
         val B = Decls.Var("B", Bool())
 
@@ -208,7 +204,7 @@ class ExplProbabilisticCommandTransFuncFullEnumTest {
         )
 
         val command = ProbabilisticCommand<StmtAction>(
-            guard, EnumeratedDistribution(
+            guard, FiniteDistribution(
                 Stmts.Assign(A, Add(A.ref, C.ref)).toAction() to 0.2,
                 Stmts.Assign(A, Int(1)).toAction() to 0.8
             )
@@ -220,7 +216,7 @@ class ExplProbabilisticCommandTransFuncFullEnumTest {
         val expected = setOf(
             dirac(ExplState.bottom()),
             dirac(createState(A to 1, B to 1)),
-            EnumeratedDistribution(
+            FiniteDistribution(
                 createState(A to 2, B to 1) to 0.2,
                 createState(A to 1, B to 1) to 0.8
             )

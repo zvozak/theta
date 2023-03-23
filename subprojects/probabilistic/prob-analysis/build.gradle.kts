@@ -5,5 +5,6 @@ dependencies {
     implementation(project(":theta-core"))
     implementation(project(":theta-prob-core"))
     implementation(project(":theta-analysis"))
+    implementation(project(":theta-xta-analysis"))
     testImplementation(project(":theta-solver-z3"))
 }

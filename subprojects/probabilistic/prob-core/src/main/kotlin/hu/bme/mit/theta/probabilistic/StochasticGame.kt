@@ -5,7 +5,7 @@ import java.util.ArrayDeque
 interface StochasticGame<N, A> {
     val initialNode: N
     fun getAvailableActions(node: N): Collection<A>
-    fun getResult(node: N, action: A): EnumeratedDistribution<N>
+    fun getResult(node: N, action: A): FiniteDistribution<N>
     fun getPlayer(node: N): Int
 
     fun getAllNodes(): Collection<N>
@@ -54,4 +54,14 @@ fun <N, A> StochasticGame<N, A>.changeInitNode(newInitNode: N) = object: Stochas
     override fun getResult(node: N, action: A) = this@changeInitNode.getResult(node, action)
     override fun getAvailableActions(node: N) = this@changeInitNode.getAvailableActions(node)
     override fun getAllNodes() = this@changeInitNode.getAllNodes()
+}
+
+fun <N, A> StochasticGame<N, A>.makeAbsorbing(filter: (N) -> Boolean) = object : StochasticGame<N, A> {
+    override val initialNode get() = this@makeAbsorbing.initialNode
+    override fun getPlayer(node: N): Int = this@makeAbsorbing.getPlayer(node)
+    override fun getResult(node: N, action: A) = this@makeAbsorbing.getResult(node, action)
+    override fun getAvailableActions(node: N) =
+        if(filter(node)) listOf()
+        else this@makeAbsorbing.getAvailableActions(node)
+    override fun getAllNodes() = this@makeAbsorbing.getAllNodes()
 }

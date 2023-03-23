@@ -1,10 +1,12 @@
 package hu.bme.mit.theta.prob.analysis
 
+import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.core.decl.IndexedConstDecl
 import hu.bme.mit.theta.core.decl.MultiIndexedConstDecl
 import hu.bme.mit.theta.core.decl.VarDecl
 import hu.bme.mit.theta.core.model.ImmutableValuation
 import hu.bme.mit.theta.core.model.Valuation
+import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.Type
 import hu.bme.mit.theta.core.type.anytype.PrimeExpr
@@ -91,3 +93,12 @@ fun extractMultiIndexValuation(
     }
     return builder.build()
 }
+
+class BasicStmtAction(private val _stmts: List<Stmt>) : StmtAction() {
+    override fun getStmts(): List<Stmt> = _stmts
+    override fun toString(): String {
+        return _stmts.toString()
+    }
+}
+
+fun Stmt.toAction() = BasicStmtAction(listOf(this))

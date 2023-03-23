@@ -13,22 +13,27 @@ class BVISolver<N, A>(
 ): StochasticGameSolver<N, A> {
 
     fun solveWithRange(analysisTask: AnalysisTask<N, A>): RangeSolution<N> {
+        require(analysisTask.discountFactor == 1.0) {
+            "Discounted reward computation with BVI is not supported (yet?)"
+        }
+
         val game = analysisTask.game
         val goal = analysisTask.goal
 
+
         // This should result in an exception if the game is infinite
         val allNodes = game.getAllNodes()
+
+        //TODO: if a generic reward func is used, check infinite reward loops before analysis if possible
+        // (at least precompute a list of non-zero reward transitions and nodes -> check during deflation)
+
         val lInit = lowerInitializer.computeAllInitialValues(game, goal)
         val uInit = upperInitilizer.computeAllInitialValues(game, goal)
         var lCurr = lInit
         var uCurr = uInit
         do {
-            lCurr =
-                (if(useGS) bellmanStepGS(game, lCurr, goal)
-                else bellmanStep(game, lCurr, goal)).result
-            uCurr =
-                (if(useGS) bellmanStepGS(game, uCurr, goal)
-                else bellmanStep(game, uCurr, goal)).result
+            lCurr = bellmanStep(game, lCurr, goal, gaussSeidel = useGS).result
+            uCurr = bellmanStep(game, uCurr, goal, gaussSeidel = useGS).result
             uCurr = deflate(game, uCurr, lCurr, goal, msecOptimalityThreshold)
             val maxDiff = allNodes.maxOfOrNull { uCurr[it]!! - lCurr[it]!! } ?: 0.0
         } while (maxDiff > threshold)
