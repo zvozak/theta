@@ -41,4 +41,5 @@ public interface StmtVisitor<P, R> {
 
 	R visit(IfStmt stmt, P param);
 
+	R visit(SimultaneousStatement stmt, P param);
 }

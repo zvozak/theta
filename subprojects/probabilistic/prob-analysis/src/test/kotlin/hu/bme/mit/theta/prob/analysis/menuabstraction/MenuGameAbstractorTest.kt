@@ -6,17 +6,12 @@ import hu.bme.mit.theta.analysis.expl.ExplState
 import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.common.visualization.writer.GraphvizWriter
 import hu.bme.mit.theta.core.decl.Decls
-import hu.bme.mit.theta.core.stmt.Stmt
 import hu.bme.mit.theta.core.stmt.Stmts.Assign
-import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs.*
-import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.type.inttype.IntExprs
 import hu.bme.mit.theta.core.type.inttype.IntExprs.*
 import hu.bme.mit.theta.core.utils.ExprUtils
-import hu.bme.mit.theta.probabilistic.EnumeratedDistribution
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
-import org.junit.Before
 import org.junit.Test
 
 class MenuGameAbstractorTest {
@@ -55,7 +50,7 @@ class MenuGameAbstractorTest {
         lts = SimpleProbLTS(commands)
         transFunc = ExplProbabilisticCommandTransFunc(0, solver)
         val abstractor = MenuGameAbstractor(
-            lts, init, transFunc
+            lts, init, transFunc, TODO(), TODO()
         )
     }
 

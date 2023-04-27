@@ -17,32 +17,23 @@ package hu.bme.mit.theta.core.utils;
 
 import com.google.common.collect.ImmutableList;
 import hu.bme.mit.theta.core.decl.VarDecl;
-import hu.bme.mit.theta.core.stmt.AssignStmt;
-import hu.bme.mit.theta.core.stmt.AssumeStmt;
-import hu.bme.mit.theta.core.stmt.HavocStmt;
-import hu.bme.mit.theta.core.stmt.IfStmt;
-import hu.bme.mit.theta.core.stmt.LoopStmt;
-import hu.bme.mit.theta.core.stmt.NonDetStmt;
-import hu.bme.mit.theta.core.stmt.OrtStmt;
-import hu.bme.mit.theta.core.stmt.PopStmt;
-import hu.bme.mit.theta.core.stmt.PushStmt;
-import hu.bme.mit.theta.core.stmt.SequenceStmt;
-import hu.bme.mit.theta.core.stmt.SkipStmt;
-import hu.bme.mit.theta.core.stmt.Stmt;
-import hu.bme.mit.theta.core.stmt.StmtVisitor;
+import hu.bme.mit.theta.core.stmt.*;
 import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.Type;
 import hu.bme.mit.theta.core.type.booltype.BoolType;
 import hu.bme.mit.theta.core.type.booltype.SmartBoolExprs;
 import hu.bme.mit.theta.core.type.fptype.FpType;
 import hu.bme.mit.theta.core.type.inttype.IntType;
+import hu.bme.mit.theta.core.utils.indexings.BasicVarIndexing;
 import hu.bme.mit.theta.core.utils.indexings.PushPopVarIndexing;
 import hu.bme.mit.theta.core.utils.indexings.VarIndexing;
+import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static hu.bme.mit.theta.core.type.abstracttype.AbstractExprs.Eq;
 import static hu.bme.mit.theta.core.type.abstracttype.AbstractExprs.Ite;
@@ -54,6 +45,7 @@ import static hu.bme.mit.theta.core.type.booltype.BoolExprs.True;
 import static hu.bme.mit.theta.core.type.fptype.FpExprs.FpAssign;
 import static hu.bme.mit.theta.core.type.inttype.IntExprs.Int;
 import static hu.bme.mit.theta.core.utils.TypeUtils.cast;
+import static java.util.stream.Collectors.toList;
 
 final class StmtToExprTransformer {
     private StmtToExprTransformer() {
@@ -224,6 +216,19 @@ final class StmtToExprTransformer {
 
             final Expr<BoolType> ite = cast(Ite(condExpr, thenExprExtended, elzeExprExtended), Bool());
             return StmtUnfoldResult.of(ImmutableList.of(ite), jointIndexing);
+        }
+
+        @Override
+        public StmtUnfoldResult visit(SimultaneousStatement stmt, VarIndexing indexing) {
+            final var results = stmt.getStmts().stream().map((s) -> toExpr(s, indexing)).collect(toList());
+            final var exprs = new ArrayList<Expr<BoolType>>();
+            var jointIndexing = indexing;
+            for (StmtUnfoldResult r : results) {
+                exprs.addAll(r.exprs);
+                jointIndexing.join(r.indexing);
+            }
+            final var expr = SmartBoolExprs.And(exprs);
+            return StmtUnfoldResult.of(ImmutableList.of(expr), jointIndexing);
         }
 
         @Override

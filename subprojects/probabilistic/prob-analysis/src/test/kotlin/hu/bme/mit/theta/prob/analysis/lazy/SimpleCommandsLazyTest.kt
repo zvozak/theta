@@ -10,6 +10,7 @@ import hu.bme.mit.theta.prob.analysis.menuabstraction.ProbabilisticCommand
 import hu.bme.mit.theta.prob.analysis.toAction
 import hu.bme.mit.theta.probabilistic.FiniteDistribution
 import hu.bme.mit.theta.probabilistic.FiniteDistribution.Companion.dirac
+import hu.bme.mit.theta.probabilistic.Goal
 import hu.bme.mit.theta.solver.z3.Z3SolverFactory
 import org.junit.Test
 
@@ -46,8 +47,9 @@ class SimpleCommandsLazyTest {
             .build()
 
         val solver = Z3SolverFactory.getInstance().createSolver()
-        val result = SimpleCommandsLazy().checkExpl(
-            commands, init, invar, solver
+        val itpSolver = Z3SolverFactory.getInstance().createItpSolver()
+        val result = SimpleCommandsLazy(solver, itpSolver).checkExpl(
+            commands, init, invar, Goal.MAX
         )
     }
 }

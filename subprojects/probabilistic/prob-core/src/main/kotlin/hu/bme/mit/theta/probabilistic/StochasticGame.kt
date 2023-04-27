@@ -33,7 +33,7 @@ interface StochasticGame<N, A> {
                     }
                 }
                 val materResult = result.transform { nodeMapping[it]!! }
-                addEdge(materNode, materResult)
+                addEdge(materNode, materResult, act.toString())
             }
         }
         setInitNode(nodeMapping[this@StochasticGame.initialNode]!!)

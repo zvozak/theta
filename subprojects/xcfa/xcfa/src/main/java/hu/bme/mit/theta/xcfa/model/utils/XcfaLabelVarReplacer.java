@@ -18,18 +18,7 @@ package hu.bme.mit.theta.xcfa.model.utils;
 
 import hu.bme.mit.theta.core.decl.Decl;
 import hu.bme.mit.theta.core.decl.VarDecl;
-import hu.bme.mit.theta.core.stmt.AssignStmt;
-import hu.bme.mit.theta.core.stmt.AssumeStmt;
-import hu.bme.mit.theta.core.stmt.HavocStmt;
-import hu.bme.mit.theta.core.stmt.IfStmt;
-import hu.bme.mit.theta.core.stmt.LoopStmt;
-import hu.bme.mit.theta.core.stmt.NonDetStmt;
-import hu.bme.mit.theta.core.stmt.OrtStmt;
-import hu.bme.mit.theta.core.stmt.PopStmt;
-import hu.bme.mit.theta.core.stmt.PushStmt;
-import hu.bme.mit.theta.core.stmt.SequenceStmt;
-import hu.bme.mit.theta.core.stmt.SkipStmt;
-import hu.bme.mit.theta.core.stmt.Stmt;
+import hu.bme.mit.theta.core.stmt.*;
 import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.LitExpr;
 import hu.bme.mit.theta.core.type.Type;
@@ -51,11 +40,7 @@ import static hu.bme.mit.theta.core.stmt.Stmts.Havoc;
 import static hu.bme.mit.theta.core.stmt.Stmts.NonDetStmt;
 import static hu.bme.mit.theta.core.stmt.Stmts.SequenceStmt;
 import static hu.bme.mit.theta.core.utils.TypeUtils.cast;
-import static hu.bme.mit.theta.xcfa.model.XcfaLabel.Load;
-import static hu.bme.mit.theta.xcfa.model.XcfaLabel.Sequence;
-import static hu.bme.mit.theta.xcfa.model.XcfaLabel.StartThread;
-import static hu.bme.mit.theta.xcfa.model.XcfaLabel.Stmt;
-import static hu.bme.mit.theta.xcfa.model.XcfaLabel.Store;
+import static hu.bme.mit.theta.xcfa.model.XcfaLabel.*;
 
 public class XcfaLabelVarReplacer implements XcfaLabelVisitor<Map<VarDecl<?>, VarDecl<?>>, XcfaLabel> {
 
@@ -156,6 +141,11 @@ public class XcfaLabelVarReplacer implements XcfaLabelVisitor<Map<VarDecl<?>, Va
     }
 
     @Override
+    public XcfaLabel visit(SimultaneousStatement stmt, Map<VarDecl<?>, VarDecl<?>> param) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public XcfaLabel visit(XcfaLabel.ProcedureCallXcfaLabel label, Map<VarDecl<?>, VarDecl<?>> param) {
         List<Expr<?>> exprs = label.getParams();
         List<Expr<?>> newExprs = new ArrayList<>();
@@ -202,7 +192,7 @@ public class XcfaLabelVarReplacer implements XcfaLabelVisitor<Map<VarDecl<?>, Va
 
     @Override
     public XcfaLabel visit(XcfaLabel.NondetLabel nondetLabel, Map<VarDecl<?>, VarDecl<?>> param) {
-        return Sequence(nondetLabel.getLabels().stream().map(label -> label.accept(this, param)).collect(Collectors.toList()));
+        return Nondet(nondetLabel.getLabels().stream().map(label -> label.accept(this, param)).collect(Collectors.toList()));
     }
 
     @Override

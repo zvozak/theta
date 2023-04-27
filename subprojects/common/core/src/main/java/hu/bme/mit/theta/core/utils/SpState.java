@@ -192,5 +192,10 @@ public class SpState {
         public SpState visit(IfStmt stmt, SpState param) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public SpState visit(SimultaneousStatement stmt, SpState param) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

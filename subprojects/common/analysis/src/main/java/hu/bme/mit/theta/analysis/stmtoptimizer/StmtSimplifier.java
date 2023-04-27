@@ -219,6 +219,20 @@ public class StmtSimplifier {
                 return SimplifyResult.of(IfStmt.of(cond, thenResult.stmt, elzeResult.stmt), SimplifyStatus.SUCCESS);
             }
         }
+
+        @Override
+        public SimplifyResult visit(SimultaneousStatement stmt, MutableValuation param) {
+            var subResults =
+                    stmt.getStmts().stream()
+                            .map((s) -> stmt.accept(this, MutableValuation.copyOf(param)))
+                            .collect(Collectors.toList());
+            return SimplifyResult.of(
+                    SimultaneousStatement.of(subResults.stream().map((r) -> r.stmt).collect(Collectors.toList())),
+                    subResults.stream().anyMatch((r) -> r.status == SimplifyStatus.BOTTOM) ?
+                            SimplifyStatus.BOTTOM :
+                            SimplifyStatus.SUCCESS
+            );
+        }
     }
 
 }

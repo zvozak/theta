@@ -1,0 +1,141 @@
+{
+  "jani-version": 1,
+  "name": "jamini",
+  "type": "mdp",
+  "features": [],
+  "actions": [{
+    "name": "f"
+  }],
+  "variables": [
+    {
+      "name": "a",
+      "type": "int",
+      "initial-value": 0
+    },
+    {
+      "name": "imtransient",
+      "type": "int",
+      "initial-value": 1,
+      "transient": true
+    }
+  ],
+  "properties": [
+    {
+      "expression": {
+        "fun": "values",
+        "op": "filter",
+        "states": {
+          "op": "initial"
+        },
+        "values": {
+          "exp": {
+            "left": true,
+            "op": "U",
+            "right": {
+              "left": "a",
+              "op": ">",
+              "right": 0
+            }
+          },
+          "op": "Pmin"
+        }
+      },
+      "name": "pmin"
+    },
+    {
+      "expression": {
+        "fun": "values",
+        "op": "filter",
+        "states": {
+          "op": "initial"
+        },
+        "values": {
+          "exp": {
+            "left": true,
+            "op": "U",
+            "right": {
+              "left": "a",
+              "op": ">",
+              "right": 0
+            }
+          },
+          "op": "Pmax"
+        }
+      },
+      "name": "pmax"
+    }
+  ],
+  "automata": [
+    {
+      "name":  "main",
+      "locations": [{
+        "name": "loc_0",
+        "transient-values": [
+          {
+            "ref": "imtransient",
+            "value": {
+              "op": "+",
+              "left": "a",
+              "right": 1
+            }
+          }
+        ]
+      }],
+      "initial-locations": ["loc_0"],
+      "edges": [
+        {
+          "location": "loc_0",
+          "guard": {
+            "exp": {
+              "op": "=",
+              "left": "a",
+              "right": 0
+            }
+          },
+          "destinations": [
+            {
+              "location": "loc_0",
+              "probability": {
+                "exp": 0.5
+              },
+              "assignments": [{
+                "ref": "a",
+                "value": "imtransient"
+              }]
+            },
+            {
+              "location": "loc_0",
+              "probability": {
+                "exp": 0.5
+              },
+              "assignments": [{
+                "ref": "a",
+                "value": 0
+              }]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "system": {
+    "elements": [
+      {"automaton": "main"},
+      {"automaton": "main"}
+    ],
+    "syncs": [
+      {
+        "synchronise": ["f", null],
+        "result": "f"
+      },
+      {
+        "synchronise": [null, "f"],
+        "result": "f"
+      },
+      {
+        "synchronise": ["f", "f"],
+        "result": "f"
+      }
+    ]
+  }
+}

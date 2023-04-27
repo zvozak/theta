@@ -81,6 +81,12 @@ public class StmtAtomCollector {
             atoms.addAll(ExprUtils.getAtoms(stmt.getCond()));
             return null;
         }
+
+        @Override
+        public Void visit(SimultaneousStatement stmt, Set<Expr<BoolType>> atoms) {
+            stmt.getStmts().forEach(s -> s.accept(this, atoms));
+            return null;
+        }
     }
 
 }

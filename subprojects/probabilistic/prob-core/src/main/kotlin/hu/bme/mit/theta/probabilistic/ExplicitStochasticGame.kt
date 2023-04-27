@@ -63,7 +63,7 @@ class ExplicitStochasticGame private constructor(
     ): FiniteDistribution<Node> = action.end
 
     override fun getAvailableActions(node: Node): Collection<Edge> =
-        outgoingEdges[node]!!
+        outgoingEdges[node] ?: listOf()
 
     override fun materialize() = this
 

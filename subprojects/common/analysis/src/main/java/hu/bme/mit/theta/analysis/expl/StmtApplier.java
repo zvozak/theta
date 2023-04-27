@@ -71,6 +71,9 @@ public final class StmtApplier {
         } else if (stmt instanceof IfStmt) {
             final IfStmt ifStmt = (IfStmt) stmt;
             return applyIf(ifStmt, val, approximate);
+        } else if (stmt instanceof SimultaneousStatement) {
+            final SimultaneousStatement simStmt = (SimultaneousStatement) stmt;
+            return applySim(simStmt, val, approximate);
         } else {
             throw new UnsupportedOperationException("Unhandled statement: " + stmt);
         }
@@ -266,6 +269,28 @@ public final class StmtApplier {
                 return ApplyResult.FAILURE;
             }
         }
+    }
+
+    private static ApplyResult applySim(final SimultaneousStatement stmt, final MutableValuation val, final boolean approximate) {
+        var applyResults = new ArrayList<ApplyResult>();
+        var resVal = MutableValuation.copyOf(val);
+        for (Stmt subStmt : stmt.getStmts()) {
+            MutableValuation copy = MutableValuation.copyOf(val);
+            ApplyResult res = apply(subStmt, copy, approximate);
+            for (Decl<?> decl : copy.getDecls()) {
+                var prev = val.eval(decl);
+                LitExpr<?> next = copy.eval(decl).get();
+                if (prev.isEmpty() || prev.get() != next) {
+                    resVal.put(decl, next);
+                }
+            }
+            applyResults.add(res);
+        }
+        val.clear();
+        val.putAll(resVal);
+        if(applyResults.contains(ApplyResult.BOTTOM)) return ApplyResult.BOTTOM;
+        if(applyResults.contains(ApplyResult.FAILURE)) return ApplyResult.FAILURE;
+        return ApplyResult.SUCCESS;
     }
 
     private static ApplyResult applyOrt(final OrtStmt stmt, final MutableValuation val,

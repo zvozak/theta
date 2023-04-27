@@ -56,4 +56,8 @@ public final class Stmts {
 		return NonDetStmt.of(stmts);
 	}
 
+	public static SimultaneousStatement SimultaneousStmt(final List<Stmt> stmts) {
+		return SimultaneousStatement.of(stmts);
+	}
+
 }

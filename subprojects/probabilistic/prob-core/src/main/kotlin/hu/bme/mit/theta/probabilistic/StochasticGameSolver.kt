@@ -1,10 +1,15 @@
 package hu.bme.mit.theta.probabilistic
 
 enum class Goal(
-    val select: (Collection<Double>) -> Double?
+    val select: (Collection<Double>) -> Double?,
 ) {
     MAX(Collection<Double>::maxOrNull),
-    MIN(Collection<Double>::minOrNull)
+    MIN(Collection<Double>::minOrNull);
+
+    fun opposite() = when(this) {
+        MAX -> MIN
+        MIN -> MAX
+    }
 }
 
 fun setGoal(vararg mapping: Pair<Int, Goal>): ((Int)-> Goal) {
@@ -24,5 +29,6 @@ interface StochasticGameSolver<N, A> {
 
 data class RangeSolution<N>(
     val lower: Map<N, Double>,
-    val upper: Map<N, Double>)
+    val upper: Map<N, Double>
+)
 

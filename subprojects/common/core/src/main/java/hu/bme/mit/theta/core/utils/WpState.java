@@ -15,28 +15,19 @@
  */
 package hu.bme.mit.theta.core.utils;
 
+import com.google.common.collect.Lists;
 import hu.bme.mit.theta.common.Utils;
 import hu.bme.mit.theta.core.decl.VarDecl;
 import hu.bme.mit.theta.core.model.BasicSubstitution;
 import hu.bme.mit.theta.core.model.Substitution;
-import hu.bme.mit.theta.core.stmt.AssignStmt;
-import hu.bme.mit.theta.core.stmt.AssumeStmt;
-import hu.bme.mit.theta.core.stmt.HavocStmt;
-import hu.bme.mit.theta.core.stmt.IfStmt;
-import hu.bme.mit.theta.core.stmt.LoopStmt;
-import hu.bme.mit.theta.core.stmt.NonDetStmt;
-import hu.bme.mit.theta.core.stmt.OrtStmt;
-import hu.bme.mit.theta.core.stmt.PopStmt;
-import hu.bme.mit.theta.core.stmt.PushStmt;
-import hu.bme.mit.theta.core.stmt.SequenceStmt;
-import hu.bme.mit.theta.core.stmt.SkipStmt;
-import hu.bme.mit.theta.core.stmt.Stmt;
-import hu.bme.mit.theta.core.stmt.StmtVisitor;
+import hu.bme.mit.theta.core.stmt.*;
 import hu.bme.mit.theta.core.type.Expr;
 import hu.bme.mit.theta.core.type.Type;
 import hu.bme.mit.theta.core.type.booltype.BoolExprs;
 import hu.bme.mit.theta.core.type.booltype.BoolType;
+import hu.bme.mit.theta.core.type.booltype.SmartBoolExprs;
 
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -201,6 +192,37 @@ public final class WpState {
 		}
 
 		@Override
+		public WpState visit(SimultaneousStatement stmt, WpState state) {
+			final var subBuilder = BasicSubstitution.builder();
+			var constCount = state.constCount;
+			var exprs = new ArrayList<Expr<BoolType>>();
+			for (Stmt subStmt : stmt.getStmts()) {
+				if(subStmt instanceof AssignStmt<?>) {
+					var assign = (AssignStmt<?>) subStmt;
+					subBuilder.put(assign.getVarDecl(), assign.getExpr());
+				} else if(subStmt instanceof SkipStmt) {
+					// Do nothing
+				} else if(subStmt instanceof HavocStmt) {
+					final var havoc = (HavocStmt) subStmt;
+					final VarDecl<?> varDecl = havoc.getVarDecl();
+					constCount++;
+					final String valName = String.format("_wp_%d", constCount);
+					final Expr<?> val = Const(valName, varDecl.getType()).getRef();
+					subBuilder.put(varDecl, val).build();
+				} else if(subStmt instanceof AssumeStmt) {
+					var assume = (AssumeStmt) subStmt;
+					exprs.add(Imply(assume.getCond(), state.getExpr()));
+				} else {
+					// TODO: generalize to all stmts
+					throw new UnsupportedOperationException();
+				}
+			}
+			final Expr<BoolType> expr = subBuilder.build().apply(state.getExpr());
+			exprs.add(expr);
+			return new WpState(SmartBoolExprs.And(exprs), constCount);
+		}
+
+		@Override
 		public WpState visit(final AssumeStmt stmt, final WpState state) {
 			final Expr<BoolType> expr = Imply(stmt.getCond(), state.getExpr());
 			final int constCount = state.constCount;
@@ -239,7 +261,7 @@ public final class WpState {
 		@Override
 		public WpState visit(SequenceStmt stmt, WpState param) {
 			WpState result = param;
-			for (Stmt subStmt : stmt.getStmts()) {
+			for (Stmt subStmt : Lists.reverse(stmt.getStmts())) {
 				result = result.wep(subStmt);
 			}
 			return result;
@@ -270,6 +292,37 @@ public final class WpState {
 		}
 		public WpState visit(IfStmt stmt, WpState param) {
 			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public WpState visit(SimultaneousStatement stmt, WpState state) {
+			final var subBuilder = BasicSubstitution.builder();
+			var constCount = state.constCount;
+			var exprs = new ArrayList<Expr<BoolType>>();
+			for (Stmt subStmt : stmt.getStmts()) {
+				if(subStmt instanceof AssignStmt<?>) {
+					var assign = (AssignStmt<?>) subStmt;
+					subBuilder.put(assign.getVarDecl(), assign.getExpr());
+				} else if(subStmt instanceof SkipStmt) {
+					// Do nothing
+				} else if(subStmt instanceof HavocStmt) {
+					final var havoc = (HavocStmt) subStmt;
+					final VarDecl<?> varDecl = havoc.getVarDecl();
+					constCount++;
+					final String valName = String.format("_wp_%d", constCount);
+					final Expr<?> val = Const(valName, varDecl.getType()).getRef();
+					subBuilder.put(varDecl, val).build();
+				} else if(subStmt instanceof AssumeStmt) {
+					var assume = (AssumeStmt) subStmt;
+					exprs.add(And(assume.getCond(), state.getExpr()));
+				} else {
+					// TODO: generalize to all stmts
+					throw new UnsupportedOperationException();
+				}
+			}
+			final Expr<BoolType> expr = subBuilder.build().apply(state.getExpr());
+			exprs.add(expr);
+			return new WpState(SmartBoolExprs.And(exprs), constCount);
 		}
 
 		@Override
