@@ -12,7 +12,6 @@ import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
 import hu.bme.mit.theta.core.type.booltype.BoolExprs.True
 import hu.bme.mit.theta.core.type.booltype.BoolType
-import hu.bme.mit.theta.core.type.booltype.SmartBoolExprs
 import hu.bme.mit.theta.core.utils.ExprSimplifier
 import hu.bme.mit.theta.core.utils.ExprUtils
 import hu.bme.mit.theta.core.utils.PathUtils
@@ -20,7 +19,6 @@ import hu.bme.mit.theta.core.utils.WpState
 import hu.bme.mit.theta.prob.analysis.jani.*
 import hu.bme.mit.theta.prob.analysis.menuabstraction.ProbabilisticCommand
 import hu.bme.mit.theta.probabilistic.FiniteDistribution
-import hu.bme.mit.theta.probabilistic.Goal
 import hu.bme.mit.theta.solver.ItpSolver
 import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
@@ -31,10 +29,18 @@ class JaniLazy(
     val itpSolver: ItpSolver
 ) {
 
+    enum class BRTDPStrategy {
+        MAX_DIFF, RANDOM, ROUND_ROBIN,
+        WEIGHTED_MAX, WEIGHTED_RANDOM,
+    }
+
     fun checkExpl(
         smdp: SMDP,
         smdpReachabilityTask: SMDPReachabilityTask,
-        useBRTDP: Boolean = false
+        useBRTDP: Boolean = false,
+        brtdpStrategy: BRTDPStrategy = BRTDPStrategy.MAX_DIFF,
+        useMay: Boolean = true,
+        useMust: Boolean = false
     ): Double {
 
         fun targetCommands(locs: List<SMDP.Location>) = listOf(
@@ -55,7 +61,7 @@ class JaniLazy(
         val fullInit = initFunc.getInitStates(fullPrec)
 
         // the task is given as the computation of P_opt(constraint U target_expr)
-        // we add checkingt that constraint is still true to every normal command,
+        // we add checking that constraint is still true to every normal command,
         // so that we hit a deadlock (w.r.t. normal commands) if it is not
         // the resulting deadlock state is non-rewarding iff the target command is not enabled, so when target_expr is false
 
@@ -72,6 +78,7 @@ class JaniLazy(
             ExplDomain::checkContainment,
             ExplDomain::isLeq,
             ExplDomain::mayBeEnabled,
+            ExplDomain::mustBeEnabled,
             ExplDomain::isEnabled,
             { sc, a ->
                 val res = domainTransFunc.getSuccStates(
@@ -84,11 +91,21 @@ class JaniLazy(
             ExplDomain::postImage,
             ExplDomain::preImage,
             ExplDomain::topAfter,
-            smdpReachabilityTask.goal
+            smdpReachabilityTask.goal,
+            useMay,
+            useMust
         )
+        val successorSelection = when(brtdpStrategy) {
+            BRTDPStrategy.MAX_DIFF -> checker::maxDiffSelection
+            BRTDPStrategy.RANDOM -> checker::randomSelection
+            BRTDPStrategy.WEIGHTED_MAX -> checker::weightedMaxSelection
+            BRTDPStrategy.WEIGHTED_RANDOM -> checker::weightedRandomSelection
+            BRTDPStrategy.ROUND_ROBIN -> checker::roundRobinSelection
+        }
+
         val subResult =
-            if(useBRTDP) checker.brtdp(checker::maxDiffSelection)
-            else checker.fullyExpandedWithSimEdges()
+            if(useBRTDP) checker.brtdp(successorSelection)
+            else checker.fullyExpanded()
         return if(smdpReachabilityTask.negateResult) 1.0 - subResult else subResult
     }
 
@@ -138,6 +155,7 @@ class JaniLazy(
             PredDomain::checkContainment,
             PredDomain::isLeq,
             PredDomain::mayBeEnabled,
+            PredDomain::mustBeEnabled,
             PredDomain::isEnabled,
             { sc, a ->
                 val res = domainTransFunc.getSuccStates(
@@ -154,112 +172,8 @@ class JaniLazy(
         )
         val subResult =
             if(useBRTDP) checker.brtdp(checker::maxDiffSelection)
-            else checker.fullyExpandedWithSimEdges()
+            else checker.fullyExpanded()
         return if(smdpReachabilityTask.negateResult) 1.0 - subResult else subResult
-    }
-
-    fun checkExpl(
-        smdp: SMDP,
-        target: (List<SMDP.Location>)->Expr<BoolType>,
-        smtSolver: Solver,
-        goal: Goal
-    ): Double {
-        fun errorCommands(locs: List<SMDP.Location>) = listOf(
-            ProbabilisticCommand(
-            target(locs), FiniteDistribution.dirac(
-                    SMDPCommandAction.skipAt(locs, smdp)
-            )
-        ))
-
-        val domainTransFunc = ExplStmtTransFunc.create(smtSolver, 0)
-        val vars = smdp.getAllVars()
-        val fullPrec = ExplPrec.of(vars)
-
-        val initFunc = SmdpInitFunc(ExplInitFunc.create(smtSolver, smdp.getFullInitExpr()), smdp)
-        val smdpLts = SmdpCommandLts<ExplState>(smdp)
-
-        val topInit = initFunc.getInitStates(ExplPrec.empty())
-        val fullInit = initFunc.getInitStates(fullPrec)
-
-        val checker = ProbLazyAbstraction<
-                SMDPState<ExplState>,
-                SMDPState<ExplState>,
-                SMDPCommandAction
-                >(
-            smdpLts::getCommandsFor, {errorCommands(it.locs)},
-            fullInit.first(), topInit.first(),
-            ExplDomain::checkContainment,
-            ExplDomain::isLeq,
-            ExplDomain::mayBeEnabled,
-            ExplDomain::isEnabled,
-            { sc, a ->
-                val res = domainTransFunc.getSuccStates(
-                    sc.domainState, a, fullPrec
-                )
-                require(res.size == 1) {"Concrete trans func returned multiple successor states :-("}
-                SMDPState(res.first(), nextLocs(sc.locs, a.destination))
-            },
-            ExplDomain::block,
-            ExplDomain::postImage,
-            ExplDomain::preImage,
-            ExplDomain::topAfter,
-            goal
-        )
-        return checker.fullyExpandedWithSimEdges()
-    }
-    fun checkPred(
-        smdp: SMDP,
-        target: (List<SMDP.Location>)->Expr<BoolType>,
-        smtSolver: Solver,
-        goal: Goal
-    ): Double {
-        fun errorCommands(locs: List<SMDP.Location>) = listOf(
-            ProbabilisticCommand(
-            target(locs), FiniteDistribution.dirac(
-                    SMDPCommandAction.skipAt(locs, smdp)
-            )
-        ))
-
-        val domainTransFunc = ExplStmtTransFunc.create(smtSolver, 0)
-        val vars = smdp.getAllVars()
-        val fullPrec = ExplPrec.of(vars)
-
-        val initFunc = SmdpInitFunc(ExplInitFunc.create(smtSolver, smdp.getFullInitExpr()), smdp)
-        val abstrInitFunc = SmdpInitFunc(
-            PredInitFunc.create(
-                PredAbstractors.booleanAbstractor(smtSolver),
-                smdp.getFullInitExpr()), smdp)
-
-        val smdpLts = SmdpCommandLts<ExplState>(smdp)
-
-        val topInit = abstrInitFunc.getInitStates(PredPrec.of())
-        val fullInit = initFunc.getInitStates(fullPrec)
-
-        val checker = ProbLazyAbstraction<
-                SMDPState<ExplState>,
-                SMDPState<PredState>,
-                SMDPCommandAction
-                >(
-            smdpLts::getCommandsFor, {errorCommands(it.locs)},
-            fullInit.first(), topInit.first(),
-            PredDomain::checkContainment,
-            PredDomain::isLeq,
-            PredDomain::mayBeEnabled,
-            PredDomain::isEnabled,
-            { sc, a ->
-                val res = domainTransFunc.getSuccStates(
-                    sc.domainState, a, fullPrec
-                )
-                require(res.size == 1) {"Concrete trans func returned multiple successor states :-("}
-                SMDPState(res.first(), nextLocs(sc.locs, a.destination))
-            },
-            PredDomain::block,
-            PredDomain::postImage,
-            PredDomain::preImage,
-            PredDomain::topAfter,
-            goal
-        )
-        return checker.fullyExpandedWithSimEdges()
     }
 
     private object ExplDomain {
@@ -275,6 +189,11 @@ class JaniLazy(
         fun mayBeEnabled(state: SMDPState<ExplState>, command: ProbabilisticCommand<SMDPCommandAction>): Boolean {
             val simplified = ExprSimplifier.simplify(command.guard, state.domainState)
             return simplified != BoolExprs.False()
+        }
+
+        fun mustBeEnabled(state: SMDPState<ExplState>, command: ProbabilisticCommand<SMDPCommandAction>): Boolean {
+            val simplified = ExprSimplifier.simplify(command.guard, state.domainState)
+            return simplified == True()
         }
 
         fun block(abstrState: SMDPState<ExplState>, expr: Expr<BoolType>, concrState: SMDPState<ExplState>): SMDPState<ExplState> {
@@ -344,6 +263,14 @@ class JaniLazy(
                 smtSolver.add(PathUtils.unfold(state.toExpr(), 0))
                 smtSolver.add(PathUtils.unfold(command.guard, 0))
                 return smtSolver.check().isSat
+            }
+        }
+
+        fun mustBeEnabled(state: SMDPState<PredState>, command: ProbabilisticCommand<SMDPCommandAction>): Boolean {
+            WithPushPop(smtSolver).use {
+                smtSolver.add(PathUtils.unfold(state.toExpr(), 0))
+                smtSolver.add(PathUtils.unfold(BoolExprs.Not(command.guard), 0))
+                return smtSolver.check().isUnsat
             }
         }
 

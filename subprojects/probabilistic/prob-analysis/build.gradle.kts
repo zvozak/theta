@@ -11,3 +11,9 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-databind:2.9.7")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.9.7")
 }
+
+//tasks.named("compileKotlin", org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java) {
+//    kotlinOptions {
+//        freeCompilerArgs += "-Xself-upper-bound-inference"
+//    }
+//}

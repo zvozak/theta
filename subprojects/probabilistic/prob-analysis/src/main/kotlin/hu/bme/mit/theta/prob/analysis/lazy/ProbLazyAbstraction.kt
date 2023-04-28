@@ -1,18 +1,17 @@
 package hu.bme.mit.theta.prob.analysis.lazy
 
-import hu.bme.mit.theta.analysis.expl.ExplState
 import hu.bme.mit.theta.analysis.expr.ExprState
 import hu.bme.mit.theta.analysis.expr.StmtAction
+import hu.bme.mit.theta.common.logging.ConsoleLogger
+import hu.bme.mit.theta.common.logging.Logger
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs.Not
-import hu.bme.mit.theta.core.type.booltype.BoolExprs.True
 import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.prob.analysis.menuabstraction.ProbabilisticCommand
 import hu.bme.mit.theta.probabilistic.*
 import hu.bme.mit.theta.probabilistic.FiniteDistribution.Companion.dirac
 import hu.bme.mit.theta.probabilistic.gamesolvers.VISolver
 import java.util.Objects
-import java.util.Queue
 import java.util.Stack
 import kotlin.math.min
 import kotlin.random.Random
@@ -25,14 +24,31 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
     private val checkContainment: (SC, SA) -> Boolean,
     private val isLeq: (SA, SA) -> Boolean,
     private val mayBeEnabled: (SA, ProbabilisticCommand<A>) -> Boolean,
+    private val mustBeEnabled: (SA, ProbabilisticCommand<A>) -> Boolean,
     private val isEnabled: (SC, ProbabilisticCommand<A>) -> Boolean,
     private val concreteTransFunc: (SC, A) -> SC,
     private val block: (SA, Expr<BoolType>, SC) -> SA,
     private val postImage: (state: SA, action: A, guard: Expr<BoolType>) -> SA,
     private val preImage: (SA, A) -> Expr<BoolType>,
     private val topAfter: (SA, A) -> SA,
-    private val goal: Goal
+    private val goal: Goal,
+    private val useMay: Boolean = true,
+    private val useMust: Boolean = false,
+    private val verboseLogging: Boolean = false,
+    private val logger: Logger = ConsoleLogger(Logger.Level.VERBOSE)
 ) {
+    private var numCoveredNodes = 0
+    private var numRealCovers = 0
+
+    private fun reset() {
+        waitlist.clear()
+        numCoveredNodes = 0
+        numRealCovers = 0
+    }
+
+    init {
+        if(!(useMay || useMust)) throw RuntimeException("No abstraction type (must/may/both) specified!")
+    }
 
     val waitlist = ArrayDeque<Node>()
 
@@ -75,12 +91,14 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         }
 
         fun coverWith(coverer: Node) {
+            numCoveredNodes++
             coveringNode = coverer
             coverer.coveredNodes.add(this)
         }
 
         fun removeCover() {
             require(isCovered)
+            numCoveredNodes--
             coveringNode!!.coveredNodes.remove(this)
             coveringNode = null
         }
@@ -127,10 +145,14 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
             }
         }
 
-        fun strengthenForCommand(
+        fun strengthenAgainstCommand(
             c: ProbabilisticCommand<A>,
+            negate: Boolean = false
         ) {
-            val modifiedAbstract = block(sa, c.guard, sc)
+            val toBlock =
+                if (negate) Not(c.guard)
+                else c.guard
+            val modifiedAbstract = block(sa, toBlock, sc)
             changeAbstractLabel(modifiedAbstract)
         }
 
@@ -142,6 +164,15 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
     inner class Edge(
         val source: Node, val target: FiniteDistribution<Pair<A, Node>>, val guard: Expr<BoolType>
     ) {
+        var targetList = target.support.toList()
+        // used for round robin strategy
+        private var nextChoice = 0
+        fun chooseNextRR(): Pair<A, Node> {
+            val res = targetList[nextChoice]
+            nextChoice = (nextChoice+1) % targetList.size
+            return res
+        }
+
         fun getActionFor(result: Node): A {
             for ((a, n) in target.support) {
                 if (n == result) return a
@@ -186,7 +217,7 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         val bestValue = goal.select(actionVals.values)
         val bests = actionVals.filterValues { it == bestValue }.map { it.key }
         val best = bests[random.nextInt(bests.size)]
-        val nextNodes = best.target.support
+        val nextNodes = best.targetList
         val maxDiff = nextNodes.maxOf {
             U.getValue(it.second) - L.getValue(it.second)
         }
@@ -195,6 +226,67 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         }
         val result = filtered[random.nextInt(filtered.size)]
         return result.second
+    }
+
+    fun weightedMaxSelection(
+        currNode: Node,
+        U: Map<Node, Double>, L: Map<Node, Double>,
+        goal: Goal
+    ): Node {
+        val O = if (goal == Goal.MAX) U else L
+        val actionVals = currNode.getOutgoingEdges().associateWith {
+            it.target.expectedValue { O.getValue(it.second) }
+        }
+        val bestValue = goal.select(actionVals.values)
+        val bests = actionVals.filterValues { it == bestValue }.map { it.key }
+        val best = bests[random.nextInt(bests.size)]
+        val actionResult = best.target
+        val weights = actionResult.support.map {
+            it.second to actionResult[it] * (U[it.second]!!-L[it.second]!!)
+        }
+        val maxWeight = weights.maxOfOrNull { it.second } ?: 0.0
+        val filtered = weights.filter { it.second == maxWeight }
+        val result = filtered[random.nextInt(filtered.size)]
+        return result.first
+    }
+    fun weightedRandomSelection(
+        currNode: Node,
+        U: Map<Node, Double>, L: Map<Node, Double>,
+        goal: Goal
+    ): Node {
+        val O = if (goal == Goal.MAX) U else L
+        val actionVals = currNode.getOutgoingEdges().associateWith {
+            it.target.expectedValue { O.getValue(it.second) }
+        }
+        val bestValue = goal.select(actionVals.values)
+        val bests = actionVals.filterValues { it == bestValue }.map { it.key }
+        val best = bests[random.nextInt(bests.size)]
+        val actionResult = best.target
+        val weights = actionResult.support.map {
+            it.second to actionResult[it] * (U[it.second]!!-L[it.second]!!)
+        }
+        val sum = weights.sumOf { it.second }
+        if(sum == 0.0) {
+            return actionResult.support.toList()[random.nextInt(actionResult.support.size)].second
+        }
+        val pmf = weights.associate { it.first to it.second / sum }
+        val result = FiniteDistribution(pmf).sample(random)
+        return result
+    }
+
+    fun roundRobinSelection(
+        currNode: Node,
+        U: Map<Node, Double>, L: Map<Node, Double>,
+        goal: Goal
+    ): Node {
+        val O = if (goal == Goal.MAX) U else L
+        val actionVals = currNode.getOutgoingEdges().associateWith {
+            it.target.expectedValue { O.getValue(it.second) }
+        }
+        val bestValue = goal.select(actionVals.values)
+        val bests = actionVals.filterValues { it == bestValue }.map { it.key }
+        val best = bests[random.nextInt(bests.size)]
+        return best.chooseNextRR().second
     }
 
     fun findMEC(root: Node): Set<Node> {
@@ -211,7 +303,7 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
 
                 val successors =
                     if (n.isCovered) setOf(n.coveringNode!!)
-                    else availableEdges(n).flatMap { it.target.support.map { it.second } }.toSet()
+                    else availableEdges(n).flatMap { it.targetList.map { it.second } }.toSet()
                 for (m in successors) {
                     if (m !in index) {
                         strongConnect(m)
@@ -240,7 +332,7 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
             val prevSCC = scc
             scc = findSCC(root, availableEdges)
             availableEdges = { n: ProbLazyAbstraction<SC, SA, A>.Node ->
-                n.getOutgoingEdges().filter { it.target.support.all { it.second in scc } }
+                n.getOutgoingEdges().filter { it.targetList.all { it.second in scc } }
             }
         } while (scc.size != prevSCC.size)
         return scc
@@ -255,7 +347,7 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         ) -> Node,
         threshold: Double = 1e-7
     ): Double {
-        waitlist.clear()
+        reset()
         val initNode = Node(initState, topInit)
 
         waitlist.add(initNode)
@@ -273,12 +365,15 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
             //----------------------------------------------------------------------------------------------------------
             // logging for experiments
             i++
-            if (i % 10 == 0)
-                println(
-                    "nodes: ${reachedSet.size}, non-covered: ${reachedSet.filterNot { it.isCovered }.size}, " +
-                            " real covers: ${reachedSet.filter { it.isCovered && it.coveringNode!!.sc != it.sc }.size} " +
-                            "[${L[initNode]}, ${U[initNode]}], d=${U[initNode]!! - L[initNode]!!}"
-                )
+            if (i % 100 == 0)
+                if(verboseLogging) {
+                    println(
+                        "$i: " +
+                        "nodes: ${reachedSet.size}, non-covered: ${reachedSet.filterNot { it.isCovered }.size}, " +
+                                " real covers: ${reachedSet.filter { it.isCovered && it.coveringNode!!.sc != it.sc }.size} " +
+                        "[${L[initNode]}, ${U[initNode]}], d=${U[initNode]!! - L[initNode]!!}"
+                    )
+                }
 
             //----------------------------------------------------------------------------------------------------------
 
@@ -351,7 +446,7 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
 
                 val mec = findMEC(node)
                 val edgesLeavingMEC = mec.flatMap {
-                    it.getOutgoingEdges().filter { it.target.support.any { it.second !in mec } }
+                    it.getOutgoingEdges().filter { it.targetList.any { it.second !in mec } }
                 }
                 if (mec.size > 1) {
                     for (n in mec) {
@@ -389,13 +484,19 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
             U = Unew
             L = Lnew
         }
+        println(
+            "final stats: " +
+            "nodes: ${reachedSet.size}, non-covered: ${reachedSet.filterNot { it.isCovered }.size}, " +
+                    " real covers: ${reachedSet.filter { it.isCovered && it.coveringNode!!.sc != it.sc }.size} " +
+            "[${L[initNode]}, ${U[initNode]}], d=${U[initNode]!! - L[initNode]!!}"
+        )
 
         return U[initNode]!!
     }
 
-    fun fullyExpandedWithSimEdges(
+    fun fullyExpanded(
     ): Double {
-        waitlist.clear()
+        reset()
 //        val initNode = Node(initState, initState as SA)
         val initNode = Node(initState, topInit)
 
@@ -433,9 +534,13 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         for (cmd in errorCommands) {
             if (isEnabled(n.sc, cmd)) {
                 n.markAsErrorNode()
+                if(useMust && !mustBeEnabled(n.sa, cmd)) {
+                    n.strengthenAgainstCommand(cmd, true)
+                }
+
                 return children // keep error nodes absorbing
-            } else if (mayBeEnabled(n.sa, cmd)) {
-                n.strengthenForCommand(cmd)
+            } else if (useMay && mayBeEnabled(n.sa, cmd)) {
+                n.strengthenAgainstCommand(cmd, false)
             }
         }
         for (cmd in stdCommands) {
@@ -447,9 +552,13 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
                     children.add(newNode)
                     a to newNode
                 }
+                if(useMust && mustBeEnabled(n.sa, cmd)) {
+                    n.strengthenAgainstCommand(cmd, true)
+                }
+
                 n.createEdge(target, cmd.guard)
-            } else if (mayBeEnabled(n.sa, cmd)) {
-                n.strengthenForCommand(cmd)
+            } else if (useMay && mayBeEnabled(n.sa, cmd)) {
+                n.strengthenAgainstCommand(cmd, false)
             }
         }
 

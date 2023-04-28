@@ -53,6 +53,7 @@ class SimpleCommandsLazy(
             ExplDomain::checkContainment,
             ExplDomain::isLeq,
             ExplDomain::mayBeEnabled,
+            ExplDomain::mustBeEnabled,
             ExplDomain::isEnabled,
             { sc, a ->
                 val res = concreteTransFunc.getSuccStates(sc, a, fullPrec)
@@ -65,7 +66,7 @@ class SimpleCommandsLazy(
             ExplDomain::topAfter,
             goal
         )
-        return checker.fullyExpandedWithSimEdges()
+        return checker.fullyExpanded()
     }
 
     private object ExplDomain {
@@ -77,6 +78,11 @@ class SimpleCommandsLazy(
         fun mayBeEnabled(state: ExplState, command: ProbabilisticCommand<BasicStmtAction>): Boolean {
             val simplified = ExprSimplifier.simplify(command.guard, state)
             return simplified != False()
+        }
+
+        fun mustBeEnabled(state: ExplState, command: ProbabilisticCommand<BasicStmtAction>): Boolean {
+            val simplified = ExprSimplifier.simplify(command.guard, state)
+            return simplified == True()
         }
 
         fun block(abstrState: ExplState, expr: Expr<BoolType>, concrState: ExplState): ExplState {
@@ -137,6 +143,14 @@ class SimpleCommandsLazy(
                 smtSolver.add(PathUtils.unfold(state.toExpr(), 0))
                 smtSolver.add(PathUtils.unfold(command.guard, 0))
                 return smtSolver.check().isSat
+            }
+        }
+
+        fun mustBeEnabled(state: PredState, command: ProbabilisticCommand<BasicStmtAction>): Boolean {
+            WithPushPop(smtSolver).use {
+                smtSolver.add(PathUtils.unfold(state.toExpr(), 0))
+                smtSolver.add(PathUtils.unfold(BoolExprs.Not(command.guard), 0))
+                return smtSolver.check().isUnsat
             }
         }
 
