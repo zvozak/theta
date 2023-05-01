@@ -21,7 +21,7 @@ import hu.bme.mit.theta.core.utils.ExprSimplifier
 import hu.bme.mit.theta.core.utils.PathUtils
 import hu.bme.mit.theta.core.utils.WpState
 import hu.bme.mit.theta.prob.analysis.BasicStmtAction
-import hu.bme.mit.theta.prob.analysis.menuabstraction.ProbabilisticCommand
+import hu.bme.mit.theta.prob.analysis.ProbabilisticCommand
 import hu.bme.mit.theta.prob.analysis.toAction
 import hu.bme.mit.theta.probabilistic.FiniteDistribution
 import hu.bme.mit.theta.probabilistic.Goal
@@ -41,9 +41,11 @@ class SimpleCommandsLazy(
         invar: Expr<BoolType>,
         goal: Goal
     ): Double {
-        val errorCommands = listOf(ProbabilisticCommand(
+        val errorCommands = listOf(
+            ProbabilisticCommand(
             BoolExprs.Not(invar), FiniteDistribution.dirac(Stmts.Skip().toAction())
-        ))
+        )
+        )
         val concreteTransFunc = ExplStmtTransFunc.create(smtSolver, 0)
         val vars = initValuation.decls.filterIsInstance<VarDecl<*>>()
         val fullPrec = ExplPrec.of(vars)

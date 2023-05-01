@@ -14,6 +14,7 @@ import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.core.type.booltype.SmartBoolExprs.And
 import hu.bme.mit.theta.core.type.inttype.IntExprs
 import hu.bme.mit.theta.core.type.inttype.IntType
+import hu.bme.mit.theta.prob.analysis.ProbabilisticCommand
 import hu.bme.mit.theta.prob.analysis.toAction
 import hu.bme.mit.theta.probabilistic.FiniteDistribution
 
@@ -52,3 +53,6 @@ fun constrainRange(vararg constraints: Pair<VarDecl<IntType>, Pair<Int, Int>>): 
 fun Expr<BoolType>.then(vararg results: Pair<Double, Stmt>) = ProbabilisticCommand<StmtAction>(
     this, FiniteDistribution(results.associate { it.second.toAction() to it.first })
 )
+
+// Expr DSL
+infix fun Decl<IntType>.lt(x: Int) = IntExprs.Lt(this.ref, IntExprs.Int(x))

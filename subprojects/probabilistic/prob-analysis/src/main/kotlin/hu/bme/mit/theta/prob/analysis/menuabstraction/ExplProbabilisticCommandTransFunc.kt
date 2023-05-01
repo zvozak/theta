@@ -23,6 +23,7 @@ import hu.bme.mit.theta.core.utils.PathUtils
 import hu.bme.mit.theta.core.utils.StmtUtils
 import hu.bme.mit.theta.core.utils.indexings.VarIndexing
 import hu.bme.mit.theta.core.utils.indexings.VarIndexingFactory
+import hu.bme.mit.theta.prob.analysis.ProbabilisticCommand
 import hu.bme.mit.theta.prob.analysis.addNewIndexToNonZero
 import hu.bme.mit.theta.prob.analysis.extractMultiIndexValuation
 import hu.bme.mit.theta.probabilistic.FiniteDistribution
