@@ -47,7 +47,7 @@ class SimpleCommandsLazy(
         val concreteTransFunc = ExplStmtTransFunc.create(smtSolver, 0)
         val vars = initValuation.decls.filterIsInstance<VarDecl<*>>()
         val fullPrec = ExplPrec.of(vars)
-        val checker = ProbLazyAbstraction(
+        val checker = ProbLazyChecker(
             {commands}, {errorCommands},
             ExplState.of(initValuation), ExplState.top(),
             ExplDomain::checkContainment,
@@ -66,7 +66,7 @@ class SimpleCommandsLazy(
             ExplDomain::topAfter,
             goal
         )
-        return checker.fullyExpanded()
+        return checker.fullyExpanded(false, 1e-7)
     }
 
     private object ExplDomain {

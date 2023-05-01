@@ -30,6 +30,7 @@ include(
         "probabilistic/prob-proto",
         "probabilistic/prob-core",
         "probabilistic/prob-analysis",
+        "probabilistic/prob-cli",
 
         "solver/solver",
         "solver/solver-z3",

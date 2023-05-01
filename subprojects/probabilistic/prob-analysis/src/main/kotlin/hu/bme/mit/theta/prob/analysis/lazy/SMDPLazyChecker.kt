@@ -10,13 +10,16 @@ import hu.bme.mit.theta.core.model.Valuation
 import hu.bme.mit.theta.core.stmt.Stmts
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
+import hu.bme.mit.theta.core.type.booltype.BoolExprs.Not
 import hu.bme.mit.theta.core.type.booltype.BoolExprs.True
 import hu.bme.mit.theta.core.type.booltype.BoolType
+import hu.bme.mit.theta.core.type.booltype.SmartBoolExprs
 import hu.bme.mit.theta.core.utils.ExprSimplifier
 import hu.bme.mit.theta.core.utils.ExprUtils
 import hu.bme.mit.theta.core.utils.PathUtils
 import hu.bme.mit.theta.core.utils.WpState
 import hu.bme.mit.theta.prob.analysis.jani.*
+import hu.bme.mit.theta.prob.analysis.lazy.SMDPLazyChecker.Algorithm.*
 import hu.bme.mit.theta.prob.analysis.menuabstraction.ProbabilisticCommand
 import hu.bme.mit.theta.probabilistic.FiniteDistribution
 import hu.bme.mit.theta.solver.ItpSolver
@@ -24,9 +27,11 @@ import hu.bme.mit.theta.solver.Solver
 import hu.bme.mit.theta.solver.utils.WithPushPop
 import hu.bme.mit.theta.xta.analysis.expl.XtaExplUtils
 
-class JaniLazy(
+class SMDPLazyChecker(
     val smtSolver: Solver,
-    val itpSolver: ItpSolver
+    val itpSolver: ItpSolver,
+    val algorithm: Algorithm,
+    val verboseLogging: Boolean = false
 ) {
 
     enum class BRTDPStrategy {
@@ -34,13 +39,17 @@ class JaniLazy(
         WEIGHTED_MAX, WEIGHTED_RANDOM,
     }
 
+    enum class Algorithm {
+        BRTDP, VI, BVI
+    }
+
     fun checkExpl(
         smdp: SMDP,
         smdpReachabilityTask: SMDPReachabilityTask,
-        useBRTDP: Boolean = false,
         brtdpStrategy: BRTDPStrategy = BRTDPStrategy.MAX_DIFF,
         useMay: Boolean = true,
-        useMust: Boolean = false
+        useMust: Boolean = false,
+        threshold: Double = 1e-7
     ): Double {
 
         fun targetCommands(locs: List<SMDP.Location>) = listOf(
@@ -48,7 +57,8 @@ class JaniLazy(
                 smdpReachabilityTask.targetExpr, FiniteDistribution.dirac(
                     SMDPCommandAction.skipAt(locs, smdp)
                 )
-            ))
+            )
+        )
 
         val domainTransFunc = ExplStmtTransFunc.create(smtSolver, 0)
         val vars = smdp.getAllVars()
@@ -68,12 +78,12 @@ class JaniLazy(
         fun commandsWithPrecondition(state: SMDPState<ExplState>) =
             smdpLts.getCommandsFor(state).map { it.withPrecondition(smdpReachabilityTask.constraint) }
 
-        val checker = ProbLazyAbstraction<
+        val checker = ProbLazyChecker<
                 SMDPState<ExplState>,
                 SMDPState<ExplState>,
                 SMDPCommandAction
                 >(
-            ::commandsWithPrecondition, {targetCommands(it.locs)},
+            ::commandsWithPrecondition, { targetCommands(it.locs) },
             fullInit.first(), topInit.first(),
             ExplDomain::checkContainment,
             ExplDomain::isLeq,
@@ -84,7 +94,7 @@ class JaniLazy(
                 val res = domainTransFunc.getSuccStates(
                     sc.domainState, a, fullPrec
                 )
-                require(res.size == 1) {"Concrete trans func returned multiple successor states :-("}
+                require(res.size == 1) { "Concrete trans func returned multiple successor states :-(" }
                 SMDPState(res.first(), nextLocs(sc.locs, a.destination))
             },
             ExplDomain::block,
@@ -93,9 +103,10 @@ class JaniLazy(
             ExplDomain::topAfter,
             smdpReachabilityTask.goal,
             useMay,
-            useMust
+            useMust,
+            verboseLogging
         )
-        val successorSelection = when(brtdpStrategy) {
+        val successorSelection = when (brtdpStrategy) {
             BRTDPStrategy.MAX_DIFF -> checker::maxDiffSelection
             BRTDPStrategy.RANDOM -> checker::randomSelection
             BRTDPStrategy.WEIGHTED_MAX -> checker::weightedMaxSelection
@@ -103,16 +114,22 @@ class JaniLazy(
             BRTDPStrategy.ROUND_ROBIN -> checker::roundRobinSelection
         }
 
-        val subResult =
-            if(useBRTDP) checker.brtdp(successorSelection)
-            else checker.fullyExpanded()
-        return if(smdpReachabilityTask.negateResult) 1.0 - subResult else subResult
+        val subResult = when (algorithm) {
+            BRTDP -> checker.brtdp(successorSelection, threshold)
+            VI -> checker.fullyExpanded(false, threshold)
+            BVI -> checker.fullyExpanded(true, threshold)
+        }
+
+        return if (smdpReachabilityTask.negateResult) 1.0 - subResult else subResult
     }
 
     fun checkPred(
         smdp: SMDP,
         smdpReachabilityTask: SMDPReachabilityTask,
-        useBRTDP: Boolean = false
+        brtdpStrategy: BRTDPStrategy = BRTDPStrategy.MAX_DIFF,
+        useMay: Boolean = true,
+        useMust: Boolean = false,
+        threshold: Double = 1e-7
     ): Double {
 
         fun targetCommands(locs: List<SMDP.Location>) = listOf(
@@ -120,7 +137,8 @@ class JaniLazy(
                 smdpReachabilityTask.targetExpr, FiniteDistribution.dirac(
                     SMDPCommandAction.skipAt(locs, smdp)
                 )
-            ))
+            )
+        )
 
         val domainTransFunc = ExplStmtTransFunc.create(smtSolver, 0)
         val vars = smdp.getAllVars()
@@ -130,7 +148,9 @@ class JaniLazy(
         val abstrInitFunc = SmdpInitFunc(
             PredInitFunc.create(
                 PredAbstractors.booleanAbstractor(smtSolver),
-                smdp.getFullInitExpr()), smdp)
+                smdp.getFullInitExpr()
+            ), smdp
+        )
 
         val smdpLts = SmdpCommandLts<ExplState>(smdp)
 
@@ -145,12 +165,12 @@ class JaniLazy(
         fun commandsWithPrecondition(state: SMDPState<ExplState>) =
             smdpLts.getCommandsFor(state).map { it.withPrecondition(smdpReachabilityTask.constraint) }
 
-        val checker = ProbLazyAbstraction<
+        val checker = ProbLazyChecker<
                 SMDPState<ExplState>,
                 SMDPState<PredState>,
                 SMDPCommandAction
                 >(
-            ::commandsWithPrecondition, {targetCommands(it.locs)},
+            ::commandsWithPrecondition, { targetCommands(it.locs) },
             fullInit.first(), topInit.first(),
             PredDomain::checkContainment,
             PredDomain::isLeq,
@@ -161,30 +181,43 @@ class JaniLazy(
                 val res = domainTransFunc.getSuccStates(
                     sc.domainState, a, fullPrec
                 )
-                require(res.size == 1) {"Concrete trans func returned multiple successor states :-("}
+                require(res.size == 1) { "Concrete trans func returned multiple successor states :-(" }
                 SMDPState(res.first(), nextLocs(sc.locs, a.destination))
             },
             PredDomain::block,
             PredDomain::postImage,
             PredDomain::preImage,
             PredDomain::topAfter,
-            smdpReachabilityTask.goal
+            smdpReachabilityTask.goal,
+            useMay, useMust, verboseLogging
         )
-        val subResult =
-            if(useBRTDP) checker.brtdp(checker::maxDiffSelection)
-            else checker.fullyExpanded()
-        return if(smdpReachabilityTask.negateResult) 1.0 - subResult else subResult
+
+        val successorSelection = when (brtdpStrategy) {
+            BRTDPStrategy.MAX_DIFF -> checker::maxDiffSelection
+            BRTDPStrategy.RANDOM -> checker::randomSelection
+            BRTDPStrategy.WEIGHTED_MAX -> checker::weightedMaxSelection
+            BRTDPStrategy.WEIGHTED_RANDOM -> checker::weightedRandomSelection
+            BRTDPStrategy.ROUND_ROBIN -> checker::roundRobinSelection
+        }
+
+        val subResult = when (algorithm) {
+            BRTDP -> checker.brtdp(successorSelection, threshold)
+            VI -> checker.fullyExpanded(false, threshold)
+            BVI -> checker.fullyExpanded(true, threshold)
+        }
+
+        return if (smdpReachabilityTask.negateResult) 1.0 - subResult else subResult
     }
 
     private object ExplDomain {
 
         fun checkContainment(sc: SMDPState<ExplState>, sa: SMDPState<ExplState>): Boolean =
             sc.locs == sa.locs &&
-            ExplOrd.getInstance().isLeq(sc.domainState, sa.domainState)
+                    ExplOrd.getInstance().isLeq(sc.domainState, sa.domainState)
 
         fun isLeq(sc: SMDPState<ExplState>, sa: SMDPState<ExplState>) =
             sc.locs == sa.locs &&
-            ExplOrd.getInstance().isLeq(sc.domainState, sa.domainState)
+                    ExplOrd.getInstance().isLeq(sc.domainState, sa.domainState)
 
         fun mayBeEnabled(state: SMDPState<ExplState>, command: ProbabilisticCommand<SMDPCommandAction>): Boolean {
             val simplified = ExprSimplifier.simplify(command.guard, state.domainState)
@@ -196,10 +229,14 @@ class JaniLazy(
             return simplified == True()
         }
 
-        fun block(abstrState: SMDPState<ExplState>, expr: Expr<BoolType>, concrState: SMDPState<ExplState>): SMDPState<ExplState> {
+        fun block(
+            abstrState: SMDPState<ExplState>,
+            expr: Expr<BoolType>,
+            concrState: SMDPState<ExplState>
+        ): SMDPState<ExplState> {
             require(
                 ExplOrd.getInstance().isLeq(concrState.domainState, abstrState.domainState) &&
-                concrState.locs == abstrState.locs
+                        concrState.locs == abstrState.locs
             ) {
                 "Block failed: Concrete state $concrState not contained in abstract state $abstrState!"
             }
@@ -223,9 +260,13 @@ class JaniLazy(
             return newAbstractExpl
         }
 
-        fun postImage(state: SMDPState<ExplState>, action: SMDPCommandAction, guard: Expr<BoolType>): SMDPState<ExplState> {
+        fun postImage(
+            state: SMDPState<ExplState>,
+            action: SMDPCommandAction,
+            guard: Expr<BoolType>
+        ): SMDPState<ExplState> {
             val res = MutableValuation.copyOf(state.domainState.`val`)
-            val stmts = listOf(Stmts.Assume(guard))+action.stmts
+            val stmts = listOf(Stmts.Assume(guard)) + action.stmts
             StmtApplier.apply(Stmts.SequenceStmt(stmts), res, true)
             return SMDPState(ExplState.of(res), nextLocs(state.locs, action.destination))
         }
@@ -245,12 +286,12 @@ class JaniLazy(
         val ord = PredOrd.create(smtSolver)
 
         fun checkContainment(sc: SMDPState<ExplState>, sa: SMDPState<PredState>): Boolean {
-            if(sc.locs != sa.locs)
+            if (sc.locs != sa.locs)
                 return false
 
             val res = sa.toExpr().eval(sc.domainState)
-            return if(res == True()) true
-            else if(res == BoolExprs.False()) false
+            return if (res == True()) true
+            else if (res == BoolExprs.False()) false
             else throw IllegalArgumentException("concrete state must be a full valuation")
         }
 
@@ -269,12 +310,17 @@ class JaniLazy(
         fun mustBeEnabled(state: SMDPState<PredState>, command: ProbabilisticCommand<SMDPCommandAction>): Boolean {
             WithPushPop(smtSolver).use {
                 smtSolver.add(PathUtils.unfold(state.toExpr(), 0))
-                smtSolver.add(PathUtils.unfold(BoolExprs.Not(command.guard), 0))
+                smtSolver.add(PathUtils.unfold(Not(command.guard), 0))
                 return smtSolver.check().isUnsat
             }
         }
 
-        fun block(abstrState: SMDPState<PredState>, expr: Expr<BoolType>, concrState: SMDPState<ExplState>): SMDPState<PredState> {
+        var useItp: Boolean = false
+        fun block(
+            abstrState: SMDPState<PredState>,
+            expr: Expr<BoolType>,
+            concrState: SMDPState<ExplState>
+        ): SMDPState<PredState> {
             require(checkContainment(concrState, abstrState)) {
                 "Block failed: Concrete state $concrState not contained in abstract state $abstrState!"
             }
@@ -282,34 +328,52 @@ class JaniLazy(
                 "Block failed: Concrete state $concrState does not contradict $expr"
             }
 
-            lateinit var itp: Expr<BoolType>
-            WithPushPop(itpSolver).use {
-                val A = itpSolver.createMarker()
-                val B = itpSolver.createMarker()
-                itpSolver.add(A, PathUtils.unfold(concrState.toExpr(), 0))
-                itpSolver.add(B, PathUtils.unfold(expr, 0))
-                val pattern = itpSolver.createBinPattern(A, B)
-                if(itpSolver.check().isSat)
-                    throw IllegalArgumentException("Block failed: Concrete state $concrState does not contradict $expr")
-                itp = itpSolver.getInterpolant(pattern).eval(A)
-            }
+            val newAbstract = if(useItp) {
+                lateinit var itp: Expr<BoolType>
+                WithPushPop(itpSolver).use {
+                    val A = itpSolver.createMarker()
+                    val B = itpSolver.createMarker()
+                    itpSolver.add(A, PathUtils.unfold(concrState.toExpr(), 0))
+                    itpSolver.add(B, PathUtils.unfold(expr, 0))
+                    val pattern = itpSolver.createBinPattern(A, B)
+                    if (itpSolver.check().isSat)
+                        throw IllegalArgumentException("Block failed: Concrete state $concrState does not contradict $expr")
+                    itp = itpSolver.getInterpolant(pattern).eval(A)
+                }
 
-            val itpConjuncts = ExprUtils.getConjuncts(PathUtils.foldin(itp, 0)).filter {
-                WithPushPop(smtSolver).use { _ ->
-                    smtSolver.add(PathUtils.unfold(abstrState.toExpr(),0))
-                    smtSolver.add(PathUtils.unfold(BoolExprs.Not(it), 0))
-                    smtSolver.check().isSat
+                val itpConjuncts = ExprUtils.getConjuncts(PathUtils.foldin(itp, 0)).filter {
+                    WithPushPop(smtSolver).use { _ ->
+                        smtSolver.add(PathUtils.unfold(abstrState.toExpr(), 0))
+                        smtSolver.add(PathUtils.unfold(Not(it), 0))
+                        smtSolver.check().isSat
+                    }
+                }
+                val newConjuncts = abstrState.domainState.preds.toSet().union(itpConjuncts)
+
+                PredState.of(newConjuncts)
+            } else {
+                val newPred = ExprUtils.canonize(Not(expr))
+                if(abstrState.domainState.preds.contains(newPred)) abstrState.domainState
+                else {
+                    val needed = WithPushPop(smtSolver).use {
+                        smtSolver.add(PathUtils.unfold(abstrState.domainState.toExpr(), 0))
+                        smtSolver.add(PathUtils.unfold(expr, 0))
+                        smtSolver.check().isSat
+                    }
+                    if (needed) {
+                        PredState.of(abstrState.domainState.preds + newPred)
+                    } else abstrState.domainState
                 }
             }
-            val newConjuncts = abstrState.domainState.preds.toSet().union(itpConjuncts)
-
-            val newAbstract =
-                PredState.of(newConjuncts)
 
             return SMDPState(newAbstract, abstrState.locs)
         }
 
-        fun postImage(state: SMDPState<PredState>, action: SMDPCommandAction, guard: Expr<BoolType>): SMDPState<PredState> {
+        fun postImage(
+            state: SMDPState<PredState>,
+            action: SMDPCommandAction,
+            guard: Expr<BoolType>
+        ): SMDPState<PredState> {
             TODO()
         }
 

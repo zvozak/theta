@@ -1,15 +1,15 @@
 package hu.bme.mit.theta.probabilistic.gamesolvers
 
-import hu.bme.mit.theta.probabilistic.RangeSolution
-import hu.bme.mit.theta.probabilistic.StochasticGameSolver
-import hu.bme.mit.theta.probabilistic.AnalysisTask
+import hu.bme.mit.theta.probabilistic.*
 
 class BVISolver<N, A>(
     val threshold: Double,
     val lowerInitializer: SGSolutionInitilizer<N, A>,
     val upperInitilizer: SGSolutionInitilizer<N, A>,
     val useGS: Boolean = false,
-    val msecOptimalityThreshold: Double = 1e-12
+    val msecOptimalityThreshold: Double = 1e-12,
+//    // uses (virtual) merging of MECs instead of deflation if only one goal is present
+//    val allowMerging: Boolean = false
 ): StochasticGameSolver<N, A> {
 
     fun solveWithRange(analysisTask: AnalysisTask<N, A>): RangeSolution<N> {
@@ -23,6 +23,13 @@ class BVISolver<N, A>(
 
         // This should result in an exception if the game is infinite
         val allNodes = game.getAllNodes()
+        val initPlayer = game.getPlayer(game.initialNode)
+        val initGoal = goal(initPlayer)
+//        if(allowMerging && allNodes.all {
+//            goal(game.getPlayer(it)) == initGoal
+//        }) {
+//            return solveWithMerging(game, initGoal)
+//        }
 
         //TODO: if a generic reward func is used, check infinite reward loops before analysis if possible
         // (at least precompute a list of non-zero reward transitions and nodes -> check during deflation)
@@ -39,6 +46,10 @@ class BVISolver<N, A>(
         } while (maxDiff > threshold)
         return RangeSolution(lCurr, uCurr)
     }
+
+//    private fun solveWithMerging(game: StochasticGame<N, A>, initGoal: Goal): RangeSolution<N> {
+//        TODO()
+//    }
 
     override fun solve(analysisTask: AnalysisTask<N, A>): Map<N, Double> {
         val (l, u) = solveWithRange(analysisTask)

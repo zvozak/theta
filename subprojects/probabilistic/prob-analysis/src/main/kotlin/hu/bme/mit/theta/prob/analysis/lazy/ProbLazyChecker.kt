@@ -1,5 +1,6 @@
 package hu.bme.mit.theta.prob.analysis.lazy
 
+import com.google.common.base.Stopwatch
 import hu.bme.mit.theta.analysis.expr.ExprState
 import hu.bme.mit.theta.analysis.expr.StmtAction
 import hu.bme.mit.theta.common.logging.ConsoleLogger
@@ -10,13 +11,15 @@ import hu.bme.mit.theta.core.type.booltype.BoolType
 import hu.bme.mit.theta.prob.analysis.menuabstraction.ProbabilisticCommand
 import hu.bme.mit.theta.probabilistic.*
 import hu.bme.mit.theta.probabilistic.FiniteDistribution.Companion.dirac
+import hu.bme.mit.theta.probabilistic.gamesolvers.MDPBVISolver
 import hu.bme.mit.theta.probabilistic.gamesolvers.VISolver
 import java.util.Objects
 import java.util.Stack
+import java.util.concurrent.TimeUnit
 import kotlin.math.min
 import kotlin.random.Random
 
-class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
+class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
     private val getStdCommands: (SC) -> Collection<ProbabilisticCommand<A>>,
     private val getErrorCommands: (SC) -> Collection<ProbabilisticCommand<A>>,
     private val initState: SC,
@@ -67,7 +70,7 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         override fun hashCode(): Int {
             // as SA and the outgoing edges change throughout building the ARG,
             // and hash maps/sets are often used during this, the hashcode must not depend on them
-            return Objects.hash(id, sc)
+            return Objects.hash(id)
         }
 
         private val outEdges = arrayListOf<Edge>()
@@ -90,8 +93,15 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
             return newEdge
         }
 
+        private var realCovered = false
         fun coverWith(coverer: Node) {
             numCoveredNodes++
+            // equality checking of sc-s can be expensive if done often,
+            // so we do this only if the number of real covers is logged
+            if(verboseLogging && coverer.sc != this.sc) {
+                realCovered = true
+                numRealCovers++
+            }
             coveringNode = coverer
             coverer.coveredNodes.add(this)
         }
@@ -99,6 +109,10 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         fun removeCover() {
             require(isCovered)
             numCoveredNodes--
+            if(verboseLogging && realCovered) {
+                realCovered = false
+                numRealCovers--
+            }
             coveringNode!!.coveredNodes.remove(this)
             coveringNode = null
         }
@@ -121,15 +135,12 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
             for (backEdge in backEdges) {
                 val parent = backEdge.source
                 val action = backEdge.getActionFor(this)
-                // is this even needed? can't we just do the blocking anyway?
-//                if (!isLeq(postImage(parent.sa, action, backEdge.guard), this.sa)) {
                 val constrainedToPreimage = block(
                     parent.sa,
                     Not(preImage(this.sa, action)),
                     parent.sc
                 )
                 parent.changeAbstractLabel(constrainedToPreimage)
-//                }
             }
         }
 
@@ -249,6 +260,7 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         val result = filtered[random.nextInt(filtered.size)]
         return result.first
     }
+
     fun weightedRandomSelection(
         currNode: Node,
         U: Map<Node, Double>, L: Map<Node, Double>,
@@ -327,11 +339,11 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         }
 
         var scc: Set<Node> = hashSetOf()
-        var availableEdges: (Node) -> List<Edge> = ProbLazyAbstraction<SC, SA, A>.Node::getOutgoingEdges
+        var availableEdges: (Node) -> List<Edge> = ProbLazyChecker<SC, SA, A>.Node::getOutgoingEdges
         do {
             val prevSCC = scc
             scc = findSCC(root, availableEdges)
-            availableEdges = { n: ProbLazyAbstraction<SC, SA, A>.Node ->
+            availableEdges = { n: ProbLazyChecker<SC, SA, A>.Node ->
                 n.getOutgoingEdges().filter { it.targetList.all { it.second in scc } }
             }
         } while (scc.size != prevSCC.size)
@@ -348,6 +360,7 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         threshold: Double = 1e-7
     ): Double {
         reset()
+        val timer = Stopwatch.createStarted()
         val initNode = Node(initState, topInit)
 
         waitlist.add(initNode)
@@ -369,9 +382,10 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
                 if(verboseLogging) {
                     println(
                         "$i: " +
-                        "nodes: ${reachedSet.size}, non-covered: ${reachedSet.filterNot { it.isCovered }.size}, " +
-                                " real covers: ${reachedSet.filter { it.isCovered && it.coveringNode!!.sc != it.sc }.size} " +
-                        "[${L[initNode]}, ${U[initNode]}], d=${U[initNode]!! - L[initNode]!!}"
+                        "nodes: ${reachedSet.size}, non-covered: ${reachedSet.size-numCoveredNodes}, " +
+                                " real covers: $numRealCovers " +
+                        "[${L[initNode]}, ${U[initNode]}], d=${U[initNode]!! - L[initNode]!!}, " +
+                        "time (ms): ${timer.elapsed(TimeUnit.MILLISECONDS)}"
                     )
                 }
 
@@ -490,14 +504,18 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
                     " real covers: ${reachedSet.filter { it.isCovered && it.coveringNode!!.sc != it.sc }.size} " +
             "[${L[initNode]}, ${U[initNode]}], d=${U[initNode]!! - L[initNode]!!}"
         )
+        timer.stop()
+        println("Total time (ms): ${timer.elapsed(TimeUnit.MILLISECONDS)}")
 
         return U[initNode]!!
     }
 
     fun fullyExpanded(
+        useBVI: Boolean = false,
+        threshold: Double
     ): Double {
         reset()
-//        val initNode = Node(initState, initState as SA)
+        val timer = Stopwatch.createStarted()
         val initNode = Node(initState, topInit)
 
         waitlist.add(initNode)
@@ -514,13 +532,20 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
             for (newNode in newNodes) {
                 close(newNode, reachedSet)
                 if (!newNode.isCovered) {
-                    waitlist.add(newNode)
+                    waitlist.addFirst(newNode)
                 }
                 reachedSet.add(newNode)
             }
         }
 
-        return computeErrorProb(initNode, reachedSet)
+        timer.stop()
+        println("Exploration time (ms): ${timer.elapsed(TimeUnit.MILLISECONDS)}")
+        timer.reset()
+        timer.start()
+        val errorProb = computeErrorProb(initNode, reachedSet, useBVI, threshold)
+        timer.stop()
+        println("Probability computation time (ms): ${timer.elapsed(TimeUnit.MILLISECONDS)}")
+        return errorProb
     }
 
     private fun expand(
@@ -603,12 +628,6 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
         override fun getResult(node: Node, action: PARGAction) =
             if (action is EdgeAction) action.e.target.transform { it.second }
             else dirac(node.coveringNode!!)
-//            action.target.transform {
-//                if (it.second.isCovered)
-//                    it.second.coveringNode!!
-//                else
-//                    it.second
-//            }
 
         override fun getPlayer(node: Node): Int = 0 // This is an MDP
 
@@ -616,11 +635,15 @@ class ProbLazyAbstraction<SC : ExprState, SA : ExprState, A : StmtAction>(
 
     private fun computeErrorProb(
         initNode: Node,
-        reachedSet: Collection<Node>
+        reachedSet: Collection<Node>,
+        useBVI: Boolean,
+        threshold: Double
     ): Double {
         val parg = PARG(initNode, reachedSet)
+        val rewardFunction = TargetRewardFunction<Node, PARGAction> { it.isErrorNode && !it.isCovered }
         val quantSolver =
-            VISolver(0.00001, TargetRewardFunction<Node, PARGAction> { it.isErrorNode && !it.isCovered }, useGS = false)
+            if(useBVI) MDPBVISolver(threshold, rewardFunction)
+            else VISolver(threshold, rewardFunction, useGS = false)
         val analysisTask = AnalysisTask(parg, { goal })
         val nodes = parg.getAllNodes()
         println("All nodes: ${nodes.size}")
