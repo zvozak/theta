@@ -228,6 +228,7 @@ class SMDPDirectChecker(
         }
 
         timer.stop()
+        println("Final nodes: ${reachedSet.size}")
         println("Total time (ms): ${timer.elapsed(TimeUnit.MILLISECONDS)}")
 
         return U[initNode]!!
@@ -265,7 +266,8 @@ class SMDPDirectChecker(
         }
 
         timer.stop()
-        println("Exploration time (ms): ${timer.elapsed(TimeUnit.MILLISECONDS)}")
+        val explorationTime = timer.elapsed(TimeUnit.MILLISECONDS)
+        println("Exploration time (ms): $explorationTime")
         timer.reset()
         timer.start()
 
@@ -299,7 +301,10 @@ class SMDPDirectChecker(
         val values = quantSolver.solve(analysisTask)
 
         timer.stop()
-        println("Probability computation time (ms): ${timer.elapsed(TimeUnit.MILLISECONDS)}")
+        val probTime = timer.elapsed(TimeUnit.MILLISECONDS)
+        println("Probability computation time (ms): $probTime")
+        println("Total time (ms): ${explorationTime+probTime}")
+        println("All nodes: ${reachedSet.size}")
 
         return values[initNode]!!
     }

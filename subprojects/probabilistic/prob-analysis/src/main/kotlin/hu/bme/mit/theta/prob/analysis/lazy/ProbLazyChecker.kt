@@ -38,7 +38,8 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
     private val useMay: Boolean = true,
     private val useMust: Boolean = false,
     private val verboseLogging: Boolean = false,
-    private val logger: Logger = ConsoleLogger(Logger.Level.VERBOSE)
+    private val logger: Logger = ConsoleLogger(Logger.Level.VERBOSE),
+    private val resetOnUncover: Boolean = true
 ) {
     private var numCoveredNodes = 0
     private var numRealCovers = 0
@@ -63,6 +64,8 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
         var sa: SA = sa
             private set
 
+        var onUncover: ((Node)->Unit)? = null
+
         val id: Int = nextNodeId++
 
         var isExpanded = false
@@ -80,6 +83,9 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
         private val coveredNodes = arrayListOf<Node>()
         val isCovered: Boolean
             get() = coveringNode != null
+
+        val isCovering: Boolean
+            get() = coveredNodes.isNotEmpty()
         var isErrorNode = false
             private set
 
@@ -115,6 +121,7 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
             }
             coveringNode!!.coveredNodes.remove(this)
             coveringNode = null
+            onUncover?.invoke(this)
         }
 
         fun changeAbstractLabel(
@@ -176,7 +183,7 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
         val source: Node, val target: FiniteDistribution<Pair<A, Node>>, val guard: Expr<BoolType>
     ) {
         var targetList = target.support.toList()
-        // used for round robin strategy
+        // used for round-robin strategy
         private var nextChoice = 0
         fun chooseNextRR(): Pair<A, Node> {
             val res = targetList[nextChoice]
@@ -369,13 +376,24 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
         var U = hashMapOf(initNode to 1.0)
         var L = hashMapOf(initNode to 0.0)
 
+
         // virtually merged end components, also maintaining a set of edges that leave the EC for each of them
         val merged = hashMapOf(initNode to (setOf(initNode) to initNode.getOutgoingEdges()))
+        var newCovered = arrayListOf<Node>()
 
+        fun onUncover(n: Node) {
+            U[n] = 1.0
+            L[n] = 0.0
+            for (node in merged[n]!!.first) {
+                merged[node] = setOf(node) to node.getOutgoingEdges()
+                if(node != n)
+                    newCovered.add(n)
+            }
+        }
         var i = 0
 
-        while (U[initNode]!! - L[initNode]!! > threshold) {
-            //----------------------------------------------------------------------------------------------------------
+//         while ( reachedSet.any{!it.isExpanded && !it.isCovered}) {
+        while ( U[initNode]!! - L[initNode]!! > threshold) {
             // logging for experiments
             i++
             if (i % 100 == 0)
@@ -393,7 +411,7 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
 
             // simulate a single trace
             val trace = arrayListOf(initNode)
-            val newCovered = arrayListOf<Node>()
+            newCovered = arrayListOf<Node>()
 
             // TODO: probability-based bound for trace length (see learning algorithms paper)
             while (
@@ -427,6 +445,9 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
                             U[newNode] = 1.0
                             L[newNode] = 1.0
                         } else {
+                            if(resetOnUncover)
+                                newNode.onUncover = ::onUncover
+
                             U[newNode] = 1.0
                             L[newNode] = 0.0
                         }
@@ -451,6 +472,13 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
                     trace.add(nextNode.coveringNode!!)
             }
 
+            //TODO: remove and do something similar that makes sense
+//            for (node in reachedSet) {
+//                merged[node] = setOf(node) to node.getOutgoingEdges()
+//            }
+//            newCovered.clear()
+//            newCovered.addAll(reachedSet.filter { it.isCovering })
+
             // for each new covered node added there is a chance that a new EC has been created
             while (newCovered.isNotEmpty()) {
                 // the covered node then must be part of the EC, so it is enough to perform EC search on the subgraph
@@ -463,9 +491,10 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
                     it.getOutgoingEdges().filter { it.targetList.any { it.second !in mec } }
                 }
                 if (mec.size > 1) {
+                    val zero = goal == Goal.MIN || (edgesLeavingMEC.isEmpty() && mec.all { it.isExpanded || it.isCovered })
                     for (n in mec) {
                         merged[n] = mec to edgesLeavingMEC
-                        if (goal == Goal.MIN || edgesLeavingMEC.isEmpty()) U[n] = 0.0
+                        if (zero) U[n] = 0.0
                     }
                 }
                 newCovered.removeAll(mec)
@@ -539,12 +568,15 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
         }
 
         timer.stop()
-        println("Exploration time (ms): ${timer.elapsed(TimeUnit.MILLISECONDS)}")
+        val explorationTime = timer.elapsed(TimeUnit.MILLISECONDS)
+        println("Exploration time (ms): $explorationTime")
         timer.reset()
         timer.start()
         val errorProb = computeErrorProb(initNode, reachedSet, useBVI, threshold)
         timer.stop()
-        println("Probability computation time (ms): ${timer.elapsed(TimeUnit.MILLISECONDS)}")
+        val probTime = timer.elapsed(TimeUnit.MILLISECONDS)
+        println("Probability computation time (ms): $probTime")
+        println("Total time (ms): ${explorationTime+probTime}")
         return errorProb
     }
 
@@ -577,7 +609,7 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
                     children.add(newNode)
                     a to newNode
                 }
-                if(useMust && mustBeEnabled(n.sa, cmd)) {
+                if(useMust && !mustBeEnabled(n.sa, cmd)) {
                     n.strengthenAgainstCommand(cmd, true)
                 }
 
@@ -593,6 +625,13 @@ class ProbLazyChecker<SC : ExprState, SA : ExprState, A : StmtAction>(
     }
 
     private fun close(node: Node, reachedSet: Collection<Node>) {
+        for (otherNode in reachedSet) {
+            if (otherNode.sc == node.sc) {
+                node.coverWith(otherNode)
+                node.strengthenForCovering()
+                return
+            }
+        }
         for (otherNode in reachedSet) {
             if (!otherNode.isCovered && checkContainment(node.sc, otherNode.sa)) {
                 node.coverWith(otherNode)

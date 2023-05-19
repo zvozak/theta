@@ -13,6 +13,7 @@ import hu.bme.mit.theta.core.stmt.Stmts.*
 import hu.bme.mit.theta.core.type.Expr
 import hu.bme.mit.theta.core.type.Type
 import hu.bme.mit.theta.core.type.abstracttype.AbstractExprs
+import hu.bme.mit.theta.core.type.abstracttype.Castable
 import hu.bme.mit.theta.core.type.anytype.Exprs
 import hu.bme.mit.theta.core.type.anytype.RefExpr
 import hu.bme.mit.theta.core.type.booltype.BoolExprs
@@ -59,7 +60,7 @@ class SMDP(
             return name
         }
     }
-    class Assignment(val ref: VarDecl<*>, val expr: Expr<*>) {
+    class Assignment(val ref: VarDecl<*>, val expr: Expr<*>, val index: Int) {
         fun toStmt() =
             if(ref.type == expr.type)
                 AssignStmt.create<Type>(ref, expr)
@@ -141,7 +142,7 @@ class SMDP(
                 Destination(replaceVars(dest.probability), dest.assignments.map {
                     val newExpr = replaceVars(it.expr)
                     val newRef = if(varLUT.containsKey(it.ref)) varLUT[it.ref] else it.ref
-                    Assignment(newRef as VarDecl<Type>, newExpr as Expr<Type>)
+                    Assignment(newRef as VarDecl<Type>, newExpr as Expr<Type>, it.index)
                 }, locLUT[dest.loc]!!)
             })
         }
@@ -197,9 +198,9 @@ class SMDPCommandAction(
 
     override fun getStmts() =
         // Apply transition
-        listOf(SimultaneousStmt(
-                this.destination.assignments.map(SMDP.Assignment::toStmt)
-        )) +
+        this.destination.assignments.groupBy { it.index }.toSortedMap().map {
+            SimultaneousStmt(it.value.map(SMDP.Assignment::toStmt))
+        } +
         // then reset all transient variables
         smdp.resetTransientsStmt() +
         // then set all transient variables based on the target locations, if it gives them a value

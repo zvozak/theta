@@ -30,6 +30,7 @@ import hu.bme.mit.theta.prob.analysis.jani.SMDPPathFormula.Quantifier.EXISTS
 import hu.bme.mit.theta.prob.analysis.jani.SMDPPathFormula.Quantifier.FORALL
 import hu.bme.mit.theta.prob.analysis.jani.SMDPProperty.*
 import hu.bme.mit.theta.probabilistic.Goal
+import kotlin.math.exp
 import hu.bme.mit.theta.prob.analysis.jani.model.BoolType as JaniBoolType
 import hu.bme.mit.theta.prob.analysis.jani.model.IntType as JaniIntType
 import hu.bme.mit.theta.prob.analysis.jani.model.RealType as JaniRealType
@@ -92,8 +93,14 @@ fun Model.toSMDP(modelParameterStrings: Map<String, String>): SMDP {
         val B = ImmutableValuation.builder()
         val toReplace = arrayListOf<Pair<VarDecl<*>, Expr<*>>>()
         for ((k, v) in constantValueMap) {
-            if(v is LitExpr<*>)
-                B.put(k, v)
+            if(v is LitExpr<*>) {
+                if(v.type == k.type)
+                    B.put(k, v)
+                else if(v.type == IntType.getInstance() && k.type == RatType.getInstance())
+                    B.put(k, IntExprs.ToRat(v as Expr<IntType>).eval(empty()))
+                else
+                    throw RuntimeException("$v of type ${v.type} cannot be assigned to $k of type ${k.type}")
+            }
             else
                 toReplace.add(k to v)
         }
@@ -154,7 +161,16 @@ fun Model.toSMDP(modelParameterStrings: Map<String, String>): SMDP {
         inits,
         props,
         variables.mapNotNull { v ->
-            if(v.transient) v.initialValue?.let { varMap[v.name]!! to it.toThetaExpr(varMap, functionMap) } else null
+            if(v.transient) v.initialValue?.let {
+                val ref = varMap[v.name]!!
+                val expr = it.toThetaExpr(varMap, functionMap)
+                if(expr.type == ref.type)
+                    ref to expr
+                else if(expr.type == IntType.getInstance() && ref.type == RatType.getInstance())
+                    ref to IntExprs.ToRat(expr as Expr<IntType>)
+                else
+                    throw RuntimeException("$expr of type ${expr.type} cannot be assigned to $ref of type ${ref.type}")
+            } else null
         }.toMap(),
         constantsValuation
     )
@@ -232,9 +248,6 @@ fun Property.toSMDPProperty(
     return if(function == Filter.VALUES) {
         require(isInitDeterministic) { "\"values\"-type properties are only supported for deterministic initial state" }
         val propExpr = this.expression.values
-//        require(propExpr is UnaryPropertyExpression || propExpr is Expectation) {
-//            "Inner property expression $propExpr in property $name is not supported yet"
-//        }
         processExpression(propExpr)
     } else if(function == Filter.MAX) {
         val propExpr = this.expression.values
@@ -380,8 +393,13 @@ fun Location.toSMDPLocation(varMap: Map<String, VarDecl<*>>, functionMap: Map<St
     val transientMap = this.transientValues.associate {
         require(it.reference is Identifier)
         val ref = varMap[it.reference.name]!!
-        val value = it.value.toThetaExpr(varMap, functionMap)
-        ref to value
+        val expr = it.value.toThetaExpr(varMap, functionMap)
+        if(ref.type == expr.type)
+            ref to expr
+        else if(ref.type == RatType.getInstance() && expr.type == IntType.getInstance())
+            ref to IntExprs.ToRat(expr as Expr<IntType>)
+        else
+            throw RuntimeException("$expr of type ${expr.type} cannot be assigned to $ref of type ${ref.type}")
     }
     return SMDP.Location(name, arrayListOf(), null, transientMap)
 }
@@ -545,9 +563,6 @@ fun Assignment.toSMDPAssignment(
     varMap: Map<String, VarDecl<*>>,
     functionMap: Map<String, Pair<List<VarDecl<*>>, Expr<*>>>
 ): SMDP.Assignment {
-    if(this.index != 0)
-        throw RuntimeException("Indexed assignment sets are not supported yet")
-
     val identifier = this.reference as? Identifier ?:
                     throw RuntimeException("Left-hand side of an assignment must be a reference.")
     val ref = varMap[identifier.name] ?:
@@ -557,7 +572,11 @@ fun Assignment.toSMDPAssignment(
 
     val expr = this.value.toThetaExpr(varMap, functionMap)
 
-    return SMDP.Assignment(ref, expr)
+    return if(expr.type == ref.type) SMDP.Assignment(ref, expr, this.index)
+    else if(expr.type == IntType.getInstance() && ref.type == RatType.getInstance())
+        SMDP.Assignment(ref, IntExprs.ToRat(expr as Expr<IntType>), this.index)
+    else
+        throw RuntimeException("$expr of type ${expr.type} cannot be assigned to $ref of type ${ref.type}")
 }
 
 fun Destination.toSMDPDestination(
@@ -602,7 +621,7 @@ fun FunctionParameter.toThetaVar(): VarDecl<*> = when (this.type) {
 }
 
 fun extractSMDPTask(prop: SMDPProperty): SMDPReachabilityTask {
-    require(prop is ProbabilityProperty) {
+    require(prop is ProbabilityProperty || prop is ProbabilityThresholdProperty) {
         "Only probability properties (Pmax and Pmin) are supported yet"
     }
 
@@ -610,13 +629,20 @@ fun extractSMDPTask(prop: SMDPProperty): SMDPReachabilityTask {
             Only reachability properties are supported yet, which must be in one of the following forms:
             F p, G p, q U p, p W ff
         """.trimIndent()
-    val pathFormula = prop.pathFormula
+    val pathFormula =
+        if(prop is ProbabilityProperty) prop.pathFormula
+        else if(prop is ProbabilityThresholdProperty) prop.pathFormula
+        else throw RuntimeException("up")
+    val optimType =
+        if(prop is ProbabilityProperty) prop.optimType
+        else if(prop is ProbabilityThresholdProperty) prop.optimType
+        else throw RuntimeException("up")
     when (pathFormula) {
         is SMDPPathFormula.Until -> {
             val left = pathFormula.left
             val right = pathFormula.right
             if (left is SMDPPathFormula.StateFormula && right is SMDPPathFormula.StateFormula) {
-                return SMDPReachabilityTask(right.expr, prop.optimType, false, left.expr)
+                return SMDPReachabilityTask(right.expr, optimType, false, left.expr)
             } else {
                 throw IllegalArgumentException(errorString)
             }
@@ -627,7 +653,7 @@ fun extractSMDPTask(prop: SMDPProperty): SMDPReachabilityTask {
             val right = pathFormula.right
             if (left is SMDPPathFormula.StateFormula && right is SMDPPathFormula.StateFormula) {
                 // not(p W q) = not(q) U not(p)
-                return SMDPReachabilityTask(BoolExprs.Not(left.expr), prop.optimType.opposite(), true, BoolExprs.Not(right.expr))
+                return SMDPReachabilityTask(BoolExprs.Not(left.expr), optimType.opposite(), true, BoolExprs.Not(right.expr))
             } else {
                 throw IllegalArgumentException(errorString)
             }
@@ -636,13 +662,13 @@ fun extractSMDPTask(prop: SMDPProperty): SMDPReachabilityTask {
         is SMDPPathFormula.Eventually -> {
             val inner = pathFormula.inner
             if (inner !is SMDPPathFormula.StateFormula) throw IllegalArgumentException(errorString)
-            return SMDPReachabilityTask(inner.expr, prop.optimType, false, True())
+            return SMDPReachabilityTask(inner.expr, optimType, false, True())
         }
 
         is SMDPPathFormula.Globally -> {
             val inner = pathFormula.inner
             if (inner !is SMDPPathFormula.StateFormula) throw IllegalArgumentException(errorString)
-            return SMDPReachabilityTask(BoolExprs.Not(inner.expr), prop.optimType.opposite(), true, True())
+            return SMDPReachabilityTask(BoolExprs.Not(inner.expr), optimType.opposite(), true, True())
         }
 
         else -> throw IllegalArgumentException(errorString)
