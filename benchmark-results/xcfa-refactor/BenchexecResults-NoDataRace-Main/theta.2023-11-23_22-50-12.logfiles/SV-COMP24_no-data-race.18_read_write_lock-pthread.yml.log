@@ -1,0 +1,202 @@
+theta/theta-start.sh sv-benchmarks/c/pthread-ext/18_read_write_lock-pthread.i --witness-only --portfolio COMPLEX --loglevel RESULT --property sv-benchmarks/c/properties/no-data-race.prp
+
+
+--------------------------------------------------------------------------------
+
+
+LD_LIBRARY_PATH=/home/runner/work/theta/theta/theta/lib /usr/lib/jvm/java-17-openjdk-amd64/bin/java -Xss120m -Xmx14210m -jar /home/runner/work/theta/theta/theta/theta.jar --witness-only --portfolio COMPLEX --loglevel RESULT --property sv-benchmarks/c/properties/no-data-race.prp --input sv-benchmarks/c/pthread-ext/18_read_write_lock-pthread.i --smt-home /home/runner/work/theta/theta/theta/solvers
+Arithmetic: []
+Using portfolio MULTITHREAD
+Current configuration: XcfaCegarConfig(errorDetectionType=DATA_RACE, abstractionSolver=Z3, validateAbstractionSolver=false, domain=EXPL, maxEnum=1, search=DFS, initPrec=EMPTY, porLevel=SPOR, coi=COI, refinementSolver=Z3, validateRefinementSolver=false, refinement=SEQ_ITP, exprSplitter=WHOLE, pruneStrategy=FULL, cexMonitor=CHECK, timeoutMs=150000) (inProcess=true)
+Serialized Config, XCFA and ParseContext in 57ms
+line 1:2 token recognition error at: '&'
+Could not parse pthread_rwlock_wrlock(call_pthread_rwlock_wrlock_ret0, (& rwlock))
+scope: Scope{
+enclosingScope: null
+symbolTable: SymbolTable(hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014abb409def8@551bdc27, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014abb409def8@5bda8e08, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014abb409def8@1e800aaa, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014abb409def8@fd07cbb, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014abb409def8@773f7880, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014abb409def8@878452d, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014abb409def8@426b6a74, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014abb409def8@4c51bb7) }
+env: Env( (Frame x <- (var x Int) y <- (var y Int) rwlock <- (var rwlock Int) reach_error_ret <- (var reach_error_ret Int) thr1_ret <- (var thr1_ret Int) thr1::arg <- (var thr1::arg Int) call_pthread_rwlock_wrlock_ret0 <- (var call_pthread_rwlock_wrlock_ret0 Int) call_pthread_rwlock_unlock_ret1 <- (var call_pthread_rwlock_unlock_ret1 Int)) )
+Erroneous XCFA, see file /tmp/xcfa9893601545794496117.json
+java.lang.reflect.InvocationTargetException
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at kotlin.reflect.jvm.internal.calls.CallerImpl$Method.callMethod(CallerImpl.kt:97)
+	at kotlin.reflect.jvm.internal.calls.CallerImpl$Method$Instance.call(CallerImpl.kt:113)
+	at kotlin.reflect.jvm.internal.KCallableImpl.call(KCallableImpl.kt:108)
+	at hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:83)
+	at hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:69)
+	at hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:33)
+	at com.google.gson.internal.bind.TypeAdapters$34$1.read(TypeAdapters.java:979)
+	at com.google.gson.Gson.fromJson(Gson.java:1058)
+	at hu.bme.mit.theta.xcfa.gson.XcfaAdapter.parseProcedures(XcfaAdapter.kt:180)
+	at hu.bme.mit.theta.xcfa.gson.XcfaAdapter.read(XcfaAdapter.kt:101)
+	at hu.bme.mit.theta.xcfa.gson.XcfaAdapter.read(XcfaAdapter.kt:30)
+	at com.google.gson.internal.bind.TypeAdapters$34$1.read(TypeAdapters.java:979)
+	at com.google.gson.Gson.fromJson(Gson.java:1058)
+	at com.google.gson.Gson.fromJson(Gson.java:1016)
+	at com.google.gson.Gson.fromJson(Gson.java:959)
+	at com.google.gson.Gson.fromJson(Gson.java:927)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarServer.lambda$run$0(XcfaCegarServer.java:138)
+	at hu.bme.mit.theta.xcfa.cli.ExitCodesKt.exitOnError(ExitCodes.kt:57)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarServer.run(XcfaCegarServer.java:108)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarServer.main(XcfaCegarServer.java:204)
+Caused by: org.antlr.v4.runtime.misc.ParseCancellationException: line 1:2 token recognition error at: '&'
+	at hu.bme.mit.theta.grammar.ThrowingErrorListener.syntaxError(Utils.kt:38)
+	at org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+	at org.antlr.v4.runtime.Lexer.notifyListeners(Lexer.java:364)
+	at org.antlr.v4.runtime.Lexer.nextToken(Lexer.java:144)
+	at org.antlr.v4.runtime.BufferedTokenStream.fetch(BufferedTokenStream.java:169)
+	at org.antlr.v4.runtime.BufferedTokenStream.sync(BufferedTokenStream.java:152)
+	at org.antlr.v4.runtime.BufferedTokenStream.consume(BufferedTokenStream.java:136)
+	at org.antlr.v4.runtime.atn.ParserATNSimulator.execATN(ParserATNSimulator.java:537)
+	at org.antlr.v4.runtime.atn.ParserATNSimulator.adaptivePredict(ParserATNSimulator.java:393)
+	at hu.bme.mit.theta.grammar.dsl.gen.ExprParser.funcLitExpr(ExprParser.java:317)
+	at hu.bme.mit.theta.grammar.dsl.gen.ExprParser.expr(ExprParser.java:189)
+	at hu.bme.mit.theta.grammar.dsl.expr.ExpressionWrapper.<init>(ExprParser.kt:86)
+	at hu.bme.mit.theta.xcfa.model.InvokeLabel$Companion.fromString(XcfaLabel.kt:54)
+	... 24 more
+Process failed! (hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:83), java.lang.reflect.InvocationTargetException)
+Caught exception: ErrorCodeException(code=1)
+Handling exception as TimeoutOrGenericError
+Current configuration: XcfaCegarConfig(errorDetectionType=DATA_RACE, abstractionSolver=z3:4.12.2, validateAbstractionSolver=false, domain=EXPL, maxEnum=1, search=DFS, initPrec=EMPTY, porLevel=SPOR, coi=COI, refinementSolver=z3:4.12.2, validateRefinementSolver=false, refinement=NWT_IT_WP, exprSplitter=WHOLE, pruneStrategy=FULL, cexMonitor=CHECK, timeoutMs=300000) (inProcess=true)
+Serialized Config, XCFA and ParseContext in 19ms
+line 1:2 token recognition error at: '&'
+Could not parse pthread_rwlock_wrlock(call_pthread_rwlock_wrlock_ret0, (& rwlock))
+scope: Scope{
+enclosingScope: null
+symbolTable: SymbolTable(hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x0000150a4009def8@551bdc27, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x0000150a4009def8@5bda8e08, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x0000150a4009def8@1e800aaa, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x0000150a4009def8@fd07cbb, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x0000150a4009def8@773f7880, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x0000150a4009def8@878452d, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x0000150a4009def8@426b6a74, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x0000150a4009def8@4c51bb7) }
+env: Env( (Frame x <- (var x Int) y <- (var y Int) rwlock <- (var rwlock Int) reach_error_ret <- (var reach_error_ret Int) thr1_ret <- (var thr1_ret Int) thr1::arg <- (var thr1::arg Int) call_pthread_rwlock_wrlock_ret0 <- (var call_pthread_rwlock_wrlock_ret0 Int) call_pthread_rwlock_unlock_ret1 <- (var call_pthread_rwlock_unlock_ret1 Int)) )
+Erroneous XCFA, see file /tmp/xcfa11792521963972298235.json
+java.lang.reflect.InvocationTargetException
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at kotlin.reflect.jvm.internal.calls.CallerImpl$Method.callMethod(CallerImpl.kt:97)
+	at kotlin.reflect.jvm.internal.calls.CallerImpl$Method$Instance.call(CallerImpl.kt:113)
+	at kotlin.reflect.jvm.internal.KCallableImpl.call(KCallableImpl.kt:108)
+	at hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:83)
+	at hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:69)
+	at hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:33)
+	at com.google.gson.internal.bind.TypeAdapters$34$1.read(TypeAdapters.java:979)
+	at com.google.gson.Gson.fromJson(Gson.java:1058)
+	at hu.bme.mit.theta.xcfa.gson.XcfaAdapter.parseProcedures(XcfaAdapter.kt:180)
+	at hu.bme.mit.theta.xcfa.gson.XcfaAdapter.read(XcfaAdapter.kt:101)
+	at hu.bme.mit.theta.xcfa.gson.XcfaAdapter.read(XcfaAdapter.kt:30)
+	at com.google.gson.internal.bind.TypeAdapters$34$1.read(TypeAdapters.java:979)
+	at com.google.gson.Gson.fromJson(Gson.java:1058)
+	at com.google.gson.Gson.fromJson(Gson.java:1016)
+	at com.google.gson.Gson.fromJson(Gson.java:959)
+	at com.google.gson.Gson.fromJson(Gson.java:927)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarServer.lambda$run$0(XcfaCegarServer.java:138)
+	at hu.bme.mit.theta.xcfa.cli.ExitCodesKt.exitOnError(ExitCodes.kt:57)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarServer.run(XcfaCegarServer.java:108)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarServer.main(XcfaCegarServer.java:204)
+Caused by: org.antlr.v4.runtime.misc.ParseCancellationException: line 1:2 token recognition error at: '&'
+	at hu.bme.mit.theta.grammar.ThrowingErrorListener.syntaxError(Utils.kt:38)
+	at org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+	at org.antlr.v4.runtime.Lexer.notifyListeners(Lexer.java:364)
+	at org.antlr.v4.runtime.Lexer.nextToken(Lexer.java:144)
+	at org.antlr.v4.runtime.BufferedTokenStream.fetch(BufferedTokenStream.java:169)
+	at org.antlr.v4.runtime.BufferedTokenStream.sync(BufferedTokenStream.java:152)
+	at org.antlr.v4.runtime.BufferedTokenStream.consume(BufferedTokenStream.java:136)
+	at org.antlr.v4.runtime.atn.ParserATNSimulator.execATN(ParserATNSimulator.java:537)
+	at org.antlr.v4.runtime.atn.ParserATNSimulator.adaptivePredict(ParserATNSimulator.java:393)
+	at hu.bme.mit.theta.grammar.dsl.gen.ExprParser.funcLitExpr(ExprParser.java:317)
+	at hu.bme.mit.theta.grammar.dsl.gen.ExprParser.expr(ExprParser.java:189)
+	at hu.bme.mit.theta.grammar.dsl.expr.ExpressionWrapper.<init>(ExprParser.kt:86)
+	at hu.bme.mit.theta.xcfa.model.InvokeLabel$Companion.fromString(XcfaLabel.kt:54)
+	... 24 more
+Process failed! (hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:83), java.lang.reflect.InvocationTargetException)
+Caught exception: ErrorCodeException(code=1)
+Handling exception as TimeoutOrGenericError
+Current configuration: XcfaCegarConfig(errorDetectionType=DATA_RACE, abstractionSolver=Z3, validateAbstractionSolver=false, domain=PRED_CART, maxEnum=1, search=DFS, initPrec=EMPTY, porLevel=SPOR, coi=COI, refinementSolver=Z3, validateRefinementSolver=false, refinement=SEQ_ITP, exprSplitter=WHOLE, pruneStrategy=FULL, cexMonitor=CHECK, timeoutMs=0) (inProcess=true)
+Serialized Config, XCFA and ParseContext in 18ms
+line 1:2 token recognition error at: '&'
+Could not parse pthread_rwlock_wrlock(call_pthread_rwlock_wrlock_ret0, (& rwlock))
+scope: Scope{
+enclosingScope: null
+symbolTable: SymbolTable(hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014e6b009def8@551bdc27, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014e6b009def8@5bda8e08, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014e6b009def8@1e800aaa, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014e6b009def8@fd07cbb, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014e6b009def8@773f7880, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014e6b009def8@878452d, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014e6b009def8@426b6a74, hu.bme.mit.theta.grammar.gson.VarDeclAdapter$$Lambda$38/0x000014e6b009def8@4c51bb7) }
+env: Env( (Frame x <- (var x Int) y <- (var y Int) rwlock <- (var rwlock Int) reach_error_ret <- (var reach_error_ret Int) thr1_ret <- (var thr1_ret Int) thr1::arg <- (var thr1::arg Int) call_pthread_rwlock_wrlock_ret0 <- (var call_pthread_rwlock_wrlock_ret0 Int) call_pthread_rwlock_unlock_ret1 <- (var call_pthread_rwlock_unlock_ret1 Int)) )
+Erroneous XCFA, see file /tmp/xcfa11395872021867808962.json
+java.lang.reflect.InvocationTargetException
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at kotlin.reflect.jvm.internal.calls.CallerImpl$Method.callMethod(CallerImpl.kt:97)
+	at kotlin.reflect.jvm.internal.calls.CallerImpl$Method$Instance.call(CallerImpl.kt:113)
+	at kotlin.reflect.jvm.internal.KCallableImpl.call(KCallableImpl.kt:108)
+	at hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:83)
+	at hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:69)
+	at hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:33)
+	at com.google.gson.internal.bind.TypeAdapters$34$1.read(TypeAdapters.java:979)
+	at com.google.gson.Gson.fromJson(Gson.java:1058)
+	at hu.bme.mit.theta.xcfa.gson.XcfaAdapter.parseProcedures(XcfaAdapter.kt:180)
+	at hu.bme.mit.theta.xcfa.gson.XcfaAdapter.read(XcfaAdapter.kt:101)
+	at hu.bme.mit.theta.xcfa.gson.XcfaAdapter.read(XcfaAdapter.kt:30)
+	at com.google.gson.internal.bind.TypeAdapters$34$1.read(TypeAdapters.java:979)
+	at com.google.gson.Gson.fromJson(Gson.java:1058)
+	at com.google.gson.Gson.fromJson(Gson.java:1016)
+	at com.google.gson.Gson.fromJson(Gson.java:959)
+	at com.google.gson.Gson.fromJson(Gson.java:927)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarServer.lambda$run$0(XcfaCegarServer.java:138)
+	at hu.bme.mit.theta.xcfa.cli.ExitCodesKt.exitOnError(ExitCodes.kt:57)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarServer.run(XcfaCegarServer.java:108)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarServer.main(XcfaCegarServer.java:204)
+Caused by: org.antlr.v4.runtime.misc.ParseCancellationException: line 1:2 token recognition error at: '&'
+	at hu.bme.mit.theta.grammar.ThrowingErrorListener.syntaxError(Utils.kt:38)
+	at org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+	at org.antlr.v4.runtime.Lexer.notifyListeners(Lexer.java:364)
+	at org.antlr.v4.runtime.Lexer.nextToken(Lexer.java:144)
+	at org.antlr.v4.runtime.BufferedTokenStream.fetch(BufferedTokenStream.java:169)
+	at org.antlr.v4.runtime.BufferedTokenStream.sync(BufferedTokenStream.java:152)
+	at org.antlr.v4.runtime.BufferedTokenStream.consume(BufferedTokenStream.java:136)
+	at org.antlr.v4.runtime.atn.ParserATNSimulator.execATN(ParserATNSimulator.java:537)
+	at org.antlr.v4.runtime.atn.ParserATNSimulator.adaptivePredict(ParserATNSimulator.java:393)
+	at hu.bme.mit.theta.grammar.dsl.gen.ExprParser.funcLitExpr(ExprParser.java:317)
+	at hu.bme.mit.theta.grammar.dsl.gen.ExprParser.expr(ExprParser.java:189)
+	at hu.bme.mit.theta.grammar.dsl.expr.ExpressionWrapper.<init>(ExprParser.kt:86)
+	at hu.bme.mit.theta.xcfa.model.InvokeLabel$Companion.fromString(XcfaLabel.kt:54)
+	... 24 more
+Process failed! (hu.bme.mit.theta.xcfa.gson.XcfaLabelAdapter.read(XcfaLabelAdapter.kt:83), java.lang.reflect.InvocationTargetException)
+Caught exception: ErrorCodeException(code=1)
+Could not handle trigger ErrorCodeException(code=1) (Available triggers: [SolverError])
+Caught exception: ErrorCodeException(code=1)
+Handling exception as Anything
+Current configuration: XcfaCegarConfig(errorDetectionType=DATA_RACE, abstractionSolver=Z3, validateAbstractionSolver=false, domain=EXPL, maxEnum=1, search=DFS, initPrec=EMPTY, porLevel=SPOR, coi=COI, refinementSolver=Z3, validateRefinementSolver=false, refinement=SEQ_ITP, exprSplitter=WHOLE, pruneStrategy=FULL, cexMonitor=CHECK, timeoutMs=150000) (inProcess=false)
+Caught exception: java.lang.IllegalStateException: No such method pthread_rwlock_rdlock.
+Handling exception as Anything
+Current configuration: XcfaCegarConfig(errorDetectionType=DATA_RACE, abstractionSolver=z3:4.12.2, validateAbstractionSolver=false, domain=EXPL, maxEnum=1, search=DFS, initPrec=EMPTY, porLevel=SPOR, coi=COI, refinementSolver=z3:4.12.2, validateRefinementSolver=false, refinement=NWT_IT_WP, exprSplitter=WHOLE, pruneStrategy=FULL, cexMonitor=CHECK, timeoutMs=300000) (inProcess=false)
+Caught exception: hu.bme.mit.theta.solver.smtlib.solver.installer.SmtLibSolverInstallerException: The version is not installed
+Handling exception as Anything
+Current configuration: XcfaCegarConfig(errorDetectionType=DATA_RACE, abstractionSolver=Z3, validateAbstractionSolver=false, domain=PRED_CART, maxEnum=1, search=DFS, initPrec=EMPTY, porLevel=SPOR, coi=COI, refinementSolver=Z3, validateRefinementSolver=false, refinement=SEQ_ITP, exprSplitter=WHOLE, pruneStrategy=FULL, cexMonitor=CHECK, timeoutMs=0) (inProcess=false)
+Caught exception: java.lang.IllegalStateException: No such method pthread_rwlock_rdlock.
+Could not handle trigger java.lang.IllegalStateException: No such method pthread_rwlock_rdlock. (Available triggers: [SolverError])
+Caught exception: java.lang.IllegalStateException: No such method pthread_rwlock_rdlock.
+Could not handle trigger java.lang.IllegalStateException: No such method pthread_rwlock_rdlock. (Available triggers: [])
+Portfolio 'COMPLEX' could not be executed.
+java.lang.IllegalStateException: No such method pthread_rwlock_rdlock.
+	at hu.bme.mit.theta.xcfa.analysis.XcfaAnalysisKt.getCoreXcfaLts$lambda-10(XcfaAnalysis.kt:85)
+	at hu.bme.mit.theta.xcfa.analysis.XcfaAnalysisKt.getXcfaLts$lambda-12(XcfaAnalysis.kt:128)
+	at hu.bme.mit.theta.xcfa.analysis.por.XcfaSporLts.getEnabledActionsFor(XcfaSporLts.kt:78)
+	at hu.bme.mit.theta.xcfa.analysis.por.XcfaSporLts.getEnabledActionsFor(XcfaSporLts.kt:39)
+	at hu.bme.mit.theta.analysis.LTS.getEnabledActionsFor(LTS.java:44)
+	at hu.bme.mit.theta.xcfa.analysis.coi.XcfaCoiMultiThread$lts$1.getEnabledActionsFor(XcfaCoiMultiThread.kt:54)
+	at hu.bme.mit.theta.xcfa.analysis.coi.XcfaCoiMultiThread$lts$1.getEnabledActionsFor(XcfaCoiMultiThread.kt:46)
+	at hu.bme.mit.theta.analysis.algorithm.ArgBuilder.expand(ArgBuilder.java:90)
+	at hu.bme.mit.theta.xcfa.analysis.XcfaAbstractor.check(XcfaAbstractor.kt:77)
+	at hu.bme.mit.theta.analysis.algorithm.cegar.CegarChecker.check(CegarChecker.java:90)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCegarConfig.check(XcfaCegarConfig.kt:188)
+	at hu.bme.mit.theta.xcfa.cli.portfolio.Complex24Kt$complexPortfolio24$checker$1.invoke(complex24.kt:43)
+	at hu.bme.mit.theta.xcfa.cli.portfolio.Complex24Kt$complexPortfolio24$checker$1.invoke(complex24.kt:39)
+	at hu.bme.mit.theta.xcfa.cli.portfolio.ConfigNode.execute(stm.kt:45)
+	at hu.bme.mit.theta.xcfa.cli.portfolio.STM.execute(stm.kt:112)
+	at hu.bme.mit.theta.xcfa.cli.portfolio.HierarchicalNode.execute(stm.kt:33)
+	at hu.bme.mit.theta.xcfa.cli.portfolio.STM.execute(stm.kt:112)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCli.runPortfolio(XcfaCli.kt:382)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCli.run(XcfaCli.kt:267)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCli.access$run(XcfaCli.kt:84)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCli$Companion.main(XcfaCli.kt:618)
+	at hu.bme.mit.theta.xcfa.cli.XcfaCli.main(XcfaCli.kt)

@@ -1,0 +1,14 @@
+theta/theta-start.sh sv-benchmarks/c/pthread-atomic/read_write_lock-1.i --witness-only --portfolio COMPLEX --loglevel RESULT --property sv-benchmarks/c/properties/no-data-race.prp
+
+
+--------------------------------------------------------------------------------
+
+
+LD_LIBRARY_PATH=/home/runner/work/theta/theta/theta/lib /usr/lib/jvm/java-17-openjdk-amd64/bin/java -Xss120m -Xmx14210m -jar /home/runner/work/theta/theta/theta/theta.jar --witness-only --portfolio COMPLEX --loglevel RESULT --property sv-benchmarks/c/properties/no-data-race.prp --input sv-benchmarks/c/pthread-atomic/read_write_lock-1.i --smt-home /home/runner/work/theta/theta/theta/solvers
+Arithmetic: []
+Using portfolio MULTITHREAD
+Current configuration: XcfaCegarConfig(errorDetectionType=DATA_RACE, abstractionSolver=Z3, validateAbstractionSolver=false, domain=EXPL, maxEnum=1, search=DFS, initPrec=EMPTY, porLevel=SPOR, coi=COI, refinementSolver=Z3, validateRefinementSolver=false, refinement=SEQ_ITP, exprSplitter=WHOLE, pruneStrategy=FULL, cexMonitor=CHECK, timeoutMs=150000) (inProcess=true)
+Serialized Config, XCFA and ParseContext in 69ms
+(SafetyResult Safe)
+(SafetyResult Safe)
+Config successful, exiting: XcfaCegarConfig(errorDetectionType=DATA_RACE, abstractionSolver=Z3, validateAbstractionSolver=false, domain=EXPL, maxEnum=1, search=DFS, initPrec=EMPTY, porLevel=SPOR, coi=COI, refinementSolver=Z3, validateRefinementSolver=false, refinement=SEQ_ITP, exprSplitter=WHOLE, pruneStrategy=FULL, cexMonitor=CHECK, timeoutMs=150000)

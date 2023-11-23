@@ -1,0 +1,8 @@
+tool	Theta 5.0.0	Theta 5.0.0	Theta 5.0.0	Theta 5.0.0
+run set	SV-COMP24_no-overflow.ConcurrencySafety-NoOverflows	SV-COMP24_no-overflow.ConcurrencySafety-NoOverflows	SV-COMP24_no-overflow.ConcurrencySafety-NoOverflows	SV-COMP24_no-overflow.ConcurrencySafety-NoOverflows
+../sv-benchmarks/c/	status	cputime (s)	walltime (s)	memory (MB)
+pthread-ext/18_read_write_lock-pthread.yml	ERROR (portfolio error)	10.375471	4.873395119000008	431.996928
+pthread-atomic/read_write_lock-1.yml	true	9.42213	3.7547263880000514	496.234496
+pthread-wmm/rfi003_tso.yml	true	10.181177	3.9631783460000065	493.027328
+pthread/lazy01.yml	true	8.079868	3.305153613000016	462.749696
+pthread-wmm/mix000.oepc.yml	true	9.498007	3.8044315160000224	481.132544

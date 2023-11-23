@@ -1,0 +1,8 @@
+tool		Theta 5.0.0	Theta 5.0.0	Theta 5.0.0	Theta 5.0.0
+run set		SV-COMP24_unreach-call.ReachSafety-Loops	SV-COMP24_unreach-call.ReachSafety-Loops	SV-COMP24_unreach-call.ReachSafety-Loops	SV-COMP24_unreach-call.ReachSafety-Loops
+../sv-benchmarks/c/		status	cputime (s)	walltime (s)	memory (MB)
+nla-digbench/ps3-ll.yml	true	TIMEOUT	120.534781	105.23462785800001	571.682816
+loop-crafted/simple_vardep_2.yml	true	TIMEOUT	120.633207	110.61747762199991	503.037952
+nla-digbench-scaling/divbin_valuebound100.yml	true	TIMEOUT	120.736044	104.44042246100003	476.930048
+nla-digbench-scaling/mannadiv_valuebound50.yml	true	ERROR (portfolio error)	18.225314	8.426816400000007	452.067328
+nla-digbench-scaling/mannadiv_unwindbound10.yml	false	ERROR (portfolio error)	22.350235	9.803391357999999	467.017728

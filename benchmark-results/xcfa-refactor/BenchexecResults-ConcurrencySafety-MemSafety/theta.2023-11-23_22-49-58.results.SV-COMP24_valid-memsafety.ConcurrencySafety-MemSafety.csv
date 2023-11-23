@@ -1,0 +1,8 @@
+tool	Theta 5.0.0	Theta 5.0.0	Theta 5.0.0	Theta 5.0.0
+run set	SV-COMP24_valid-memsafety.ConcurrencySafety-MemSafety	SV-COMP24_valid-memsafety.ConcurrencySafety-MemSafety	SV-COMP24_valid-memsafety.ConcurrencySafety-MemSafety	SV-COMP24_valid-memsafety.ConcurrencySafety-MemSafety
+../sv-benchmarks/c/	status	cputime (s)	walltime (s)	memory (MB)
+pthread-ext/18_read_write_lock-pthread.yml	ERROR (generic error)	8.144398	4.465138914000022	402.313216
+pthread-atomic/read_write_lock-1.yml	true	8.781011	3.462850829000047	468.185088
+pthread-wmm/rfi003_tso.yml	true	9.279061	3.7725319139999556	484.737024
+pthread/lazy01.yml	true	6.399839	2.942461791000028	441.217024
+pthread-wmm/mix000.oepc.yml	true	8.99282	3.59806058099997	470.331392

@@ -1,0 +1,8 @@
+tool		Theta 5.0.0	Theta 5.0.0	Theta 5.0.0	Theta 5.0.0
+run set		SV-COMP24_unreach-call.ReachSafety-Floats	SV-COMP24_unreach-call.ReachSafety-Floats	SV-COMP24_unreach-call.ReachSafety-Floats	SV-COMP24_unreach-call.ReachSafety-Floats
+../sv-benchmarks/c/		status	cputime (s)	walltime (s)	memory (MB)
+float-benchs/float_double.yml	true	ERROR (portfolio error)	6.857922	4.262027629000045	309.633024
+float-benchs/zonotope_loose.c.v+cfa-reducer.yml	true	ERROR (portfolio error)	7.813491	4.518467826999995	332.697600
+float-benchs/float_int_inv_square.yml	false	ERROR (portfolio error)	7.678865	4.478251889000035	326.836224
+floats-cdfpl/square_3.yml	false	ERROR (portfolio error)	7.58419	4.421697391000066	323.719168
+floats-cbmc-regression/float11.yml	true	ERROR (portfolio error)	7.03318	4.313150807999932	307.286016
