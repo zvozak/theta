@@ -29,6 +29,6 @@ object PomdpDslManager {
         pomdp.mdp.setDiscount(model.discount.text.toDouble())
         pomdp.mdp.setValues(model.values.text)
 
-        // TODO return SimplePomdp()
+        return pomdp
     }
 }

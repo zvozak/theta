@@ -52,7 +52,7 @@ class SimpleMDP : IMDP<State, Action> {
         require(initState != null) { "State $name cannot be set as initial state: it cannot be found." }
     }
 
-    fun setValues(values: Values){
+    override fun setValues(values: Values){
         this.values = values
     }
     

@@ -9,4 +9,5 @@ interface IMDP<S, A> {
     fun setInitState(s: S)
     fun setDiscount(discount: Double)
     fun visualize(filename: String)
+    fun setValues(values: SimpleMDP.Values)
 }
