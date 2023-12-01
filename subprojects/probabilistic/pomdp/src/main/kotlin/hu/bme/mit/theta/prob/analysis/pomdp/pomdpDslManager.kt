@@ -27,7 +27,7 @@ object PomdpDslManager {
 
         var pomdp = SimplePomdp()
         pomdp.mdp.setDiscount(model.discount.text.toDouble())
-        pomdp.mdp.setValues(model.values.text)
+        pomdp.mdp.setValues(SimpleMDP.Values.valueOf(model.values.text))
 
         return pomdp
     }
