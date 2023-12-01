@@ -31,6 +31,7 @@ include(
         "probabilistic/prob-core",
         "probabilistic/prob-analysis",
         "probabilistic/prob-cli",
+        "probabilistic/pomdp",
 
         "solver/solver",
         "solver/solver-z3",
