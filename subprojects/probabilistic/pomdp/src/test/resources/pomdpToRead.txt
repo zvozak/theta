@@ -1,0 +1,23 @@
+# POMDP file for the following grid world
+
+#  *
+#  **
+#   +
+
+discount: 0.950000
+values: reward
+states: 13
+actions: 3
+observations: 9
+
+start:
+0.083337 0.083333 0.083333 0.083333 0.083333 0.083333 0.083333 0.083333 0.083333 0.083333 0.083333 0.083333 0.0
+
+# Transition Probabilities
+T: 0 : 0 : 0 1.000000
+T: 1 : 0 : 1 1.000000
+T: 2 : 0 : 3 1.000000
+T: 0 : 1 : 1 1.000000
+T: 1 : 1 : 2 1.000000
+T: 2 : 1 : 0 1.000000
+T: 0 : 2 : 6 1.000000

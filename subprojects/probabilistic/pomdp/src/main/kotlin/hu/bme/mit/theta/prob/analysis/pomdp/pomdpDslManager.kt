@@ -1,19 +1,19 @@
 package hu.bme.mit.theta.prob.analysis.pomdp
 
-import com.google.common.collect.ImmutableList
 import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslLexer
 import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslParser
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
 
 object PomdpDslManager {
     @Throws(IOException::class)
-    fun createPOMDP(inputString: String): SimplePomdp {
-        val stream: InputStream = ByteArrayInputStream(inputString.toByteArray(charset(StandardCharsets.UTF_8.name())))
+    fun createPOMDP(filename: String): SimplePomdp {
+        val stream: InputStream = File(filename).inputStream()
         return createPomdp(stream)
     }
 
@@ -26,8 +26,28 @@ object PomdpDslManager {
         val model: PomdpDslParser.PomdpContext = parser.pomdp()
 
         var pomdp = SimplePomdp()
-        pomdp.mdp.setDiscount(model.discount.text.toDouble())
+        /*
+        pomdp.mdp.discount = model.discount.text.toDouble()
         pomdp.mdp.setValues(SimpleMDP.Values.valueOf(model.values.text))
+        val states =
+            if(model.numberOfStates != null){
+                NamedElement.createNumberedElements<State>(model.numberOfStates.text.toInt())
+            }
+            else{
+                for (state in model.states){
+
+                }
+            }
+        for (state in states){
+            pomdp.mdp.addState(state);
+        }
+        when (model){
+
+            for(tran in model.transitions){
+
+            }
+        }
+*/
 
         return pomdp
     }

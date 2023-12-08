@@ -8,15 +8,12 @@ import hu.bme.mit.theta.common.visualization.writer.GraphvizWriter
 import java.awt.Color
 
 class SimpleMDP : IMDP<State, Action> {
-    enum class Values(val v: String) { REWARD("REWARD"), COST("COST") }
-
-    protected lateinit var values: SimpleMDP.Values
-    protected val states = mutableSetOf<State>()
-    protected val actions: MutableSet<Action> = mutableSetOf<Action>()
-    protected val transitionRelation = hashMapOf<State, MutableMap<Action, distribution<State>>>()
-    protected var initState: State? = null
-    var discount: Double = 1.0
-    // TODO var values: Values = Values.COST
+    override lateinit var values: Values
+    override var discount: Double = 0.0
+    override val states = mutableSetOf<State>()
+    override val actions: MutableSet<Action> = mutableSetOf<Action>()
+    override val transitionRelation = hashMapOf<State, MutableMap<Action, Distribution<State>>>()
+    override var initState: State? = null
 
     //region Modifiers
     fun addState(name: String): State {
@@ -32,7 +29,7 @@ class SimpleMDP : IMDP<State, Action> {
         states.add(newState)
     }
 
-    override fun addTransition(source: State, destinations: distribution<State>, action: Action) {
+    override fun addTransition(source: State, destinations: Distribution<State>, action: Action) {
         require(states.containsAll(transitionRelation.keys)) { "A transition must not lead to states outside of the MDP!" }
         if (transitionRelation.containsKey(source).not()) transitionRelation[source] = mutableMapOf()
 
@@ -41,30 +38,33 @@ class SimpleMDP : IMDP<State, Action> {
         ) { "Action $action.name has already been defined on state $source.name." }
         transitionRelation[source]!![action] = destinations
     }
-
+    /*
     override fun setInitState(s: State) {
         require(s in states) { "Initial state could not be set: no state found with name $s.name." }
         initState = s
     }
+
+    override fun setValues(values: Values) {
+        this.values = values
+    }*/
 
     fun setInitState(name: String) {
         initState = states.find { s -> s.name == name }
         require(initState != null) { "State $name cannot be set as initial state: it cannot be found." }
     }
 
-    override fun setValues(values: Values){
-        this.values = values
-    }
-    
+
     //endregion
 
     //region Accessors
+    /*
     override fun getInitState(): State = initState ?: throw IllegalStateException("No initial state has been set yet.")
+    override fun getDiscount() = discount
     override fun setDiscount(discount: Double) {
         this.discount = discount
     }
-
-    override fun getNextStateDistribution(s: State, a: Action): distribution<State> {
+*/
+    override fun getNextStateDistribution(s: State, a: Action): Distribution<State> {
         require(s in states) { "State $s.name cannot be found." }
         require(transitionRelation.containsKey(s)) { "No actions are available from state $s.name." }
 

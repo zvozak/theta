@@ -43,7 +43,7 @@ class Observation(name: String) : NamedElement(name)
 
 interface POMDP<S, A, O> {
     fun getUnderlyingMDP(): IMDP<S, A>
-    fun getObservations(s: S): distribution<O>
+    fun getObservations(s: S): Distribution<O>
     //fun computeBeliefMDP(numSteps: Int): MDP<BeliefState<S>, A>
 }
 /*
@@ -62,11 +62,11 @@ class BeliefState<S : IState>(val d: Distribution<S>) {
 
 open class POMDPImpl<S, A, O> : POMDP<S, A, O> {
     lateinit var mdp: IMDP<S, A>
-    lateinit var observationFunction: (S) -> distribution<O>
+    lateinit var observationFunction: (S) -> Distribution<O>
 
     override fun getUnderlyingMDP(): IMDP<S, A> = mdp
 
-    override fun getObservations(s: S): distribution<O> = observationFunction(s)
+    override fun getObservations(s: S): Distribution<O> = observationFunction(s)
     /* TODO
         override fun computeBeliefMDP(numSteps: Int): MDP<BeliefState<S>, A> {
             val beliefMDP: MDP<BeliefState<S>, A>
