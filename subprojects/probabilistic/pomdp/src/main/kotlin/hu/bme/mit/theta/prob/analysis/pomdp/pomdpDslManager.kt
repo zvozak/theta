@@ -24,23 +24,24 @@ object PomdpDslManager {
         val tokenStream = CommonTokenStream(lexer)
         val parser = PomdpDslParser(tokenStream)
         val model: PomdpDslParser.PomdpContext = parser.pomdp()
-
         var pomdp = SimplePomdp()
-        /*
-        pomdp.mdp.discount = model.discount.text.toDouble()
-        pomdp.mdp.setValues(SimpleMDP.Values.valueOf(model.values.text))
-        val states =
-            if(model.numberOfStates != null){
-                NamedElement.createNumberedElements<State>(model.numberOfStates.text.toInt())
-            }
-            else{
-                for (state in model.states){
+        pomdp.mdp = SimpleMDP()
 
-                }
+        pomdp.mdp.discount = model.discount.text.toDouble()
+        pomdp.mdp.values = Values.valueOf(model.values.text.uppercase())
+        if(model.numberOfStates != null){
+            val states = NamedElement.createNumberedElements<State>(model.numberOfStates.text.toInt())
+            for (state in states) {
+                pomdp.mdp.addState(state)
             }
-        for (state in states){
-            pomdp.mdp.addState(state);
         }
+        else{
+            for (state in model.states){
+                pomdp.mdp.addState(State(state.text))
+            }
+        }
+
+        /*
         when (model){
 
             for(tran in model.transitions){
