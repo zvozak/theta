@@ -16,7 +16,7 @@ open class NamedElement(val name: String) {
         }
 
         inline fun <reified T : NamedElement> createElement(number: Int): T {
-            require(number > 0) {
+            require(number >= 0) {
                 "ID must be a positive integer."
             }
             val id: String =  /*T::class.simpleName + "_" +*/ number.toString()
@@ -25,23 +25,32 @@ open class NamedElement(val name: String) {
 
         inline fun <reified T : NamedElement> createNumberedElements(numberOfStates: Int): Set<T> {
             return buildSet {
-                for (id in 1..numberOfStates) {
+                for (id in 0..numberOfStates-1) {
                     add(createElement<T>(id))
                 }
             }
         }
     }
+}
+
+class Action(name: String) : NamedElement(name){
     override fun equals(other: Any?): Boolean {
-        return other is NamedElement && other.name == this.name
+        return other is Action && other.name.equals(this.name)
+    }
+}
+class State(name: String) : NamedElement(name){
+    override fun equals(other: Any?): Boolean {
+        return other is State && other.name.equals(this.name)
+    }
+}
+class Observation(name: String) : NamedElement(name){
+    override fun equals(other: Any?): Boolean {
+        return other is Observation && other.name.equals(this.name)
     }
 }
 
-class Action(name: String) : NamedElement(name)
-class State(name: String) : NamedElement(name)
-class Observation(name: String) : NamedElement(name)
 
-
-interface POMDP<S, A, O> {
+interface IPOMDP<S, A, O> {
     fun getUnderlyingMDP(): IMDP<S, A>
     fun getObservations(s: S): Distribution<O>
     //fun computeBeliefMDP(numSteps: Int): MDP<BeliefState<S>, A>
@@ -60,8 +69,7 @@ class BeliefState<S : IState>(val d: Distribution<S>) {
     }
 }*/
 
-open class POMDPImpl<S, A, O> : POMDP<S, A, O> {
-    lateinit var mdp: IMDP<S, A>
+open class POMDPImpl<S, A, O>(val mdp: IMDP<S, A>) : IPOMDP<S, A, O> {
     lateinit var observationFunction: (S) -> Distribution<O>
 
     override fun getUnderlyingMDP(): IMDP<S, A> = mdp
@@ -73,7 +81,7 @@ open class POMDPImpl<S, A, O> : POMDP<S, A, O> {
         }*/
 }
 
-open class SimplePomdp : POMDPImpl<State, Action, Observation>() {
+open class SimplePomdp(mdp: SimpleMDP) : POMDPImpl<State, Action, Observation>(mdp) {
     companion object{
         fun readFromFile(filename: String): SimplePomdp {
             return PomdpDslManager.createPOMDP(filename)

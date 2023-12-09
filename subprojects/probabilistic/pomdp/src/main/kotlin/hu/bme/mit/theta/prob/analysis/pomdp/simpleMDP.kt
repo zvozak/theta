@@ -7,13 +7,20 @@ import hu.bme.mit.theta.common.visualization.Shape
 import hu.bme.mit.theta.common.visualization.writer.GraphvizWriter
 import java.awt.Color
 
-class SimpleMDP : IMDP<State, Action> {
-    override lateinit var values: Values
-    override var discount: Double = 0.0
-    override val states = mutableSetOf<State>()
-    override val actions: MutableSet<Action> = mutableSetOf<Action>()
-    override val transitionRelation = hashMapOf<State, MutableMap<Action, Distribution<State>>>()
-    override var initState: State? = null
+class SimpleMDP(
+    discount: Double,
+    values: Values,
+    states:  MutableSet<State>,
+    actions: MutableSet<Action>,
+    transitionRelation:  HashMap<State, MutableMap<Action, Distribution<State>>>,
+    override var initState: State? = null,
+) : IMDP<State, Action> {
+    override val discount = discount
+    override var values = values
+    override val states = states
+    override val actions = actions
+    override val transitionRelation = transitionRelation
+    //override var initState = initState
 
     //region Modifiers
     fun addState(name: String): State {
@@ -38,20 +45,19 @@ class SimpleMDP : IMDP<State, Action> {
         ) { "Action $action.name has already been defined on state $source.name." }
         transitionRelation[source]!![action] = destinations
     }
-    /*
-    override fun setInitState(s: State) {
+
+    /*fun setInitState(s: State) {
         require(s in states) { "Initial state could not be set: no state found with name $s.name." }
         initState = s
     }
-
     override fun setValues(values: Values) {
         this.values = values
-    }*/
+    }
 
     fun setInitState(name: String) {
-        initState = states.find { s -> s.name == name }
+        initState = states.find { s -> s.name == name } ?: throw IllegalArgumentException("meow")
         require(initState != null) { "State $name cannot be set as initial state: it cannot be found." }
-    }
+    }*/
 
 
     //endregion
@@ -73,7 +79,7 @@ class SimpleMDP : IMDP<State, Action> {
     }
 
     override fun getAvailableActions(s: State): Collection<Action> =
-        transitionRelation[s]?.keys ?: throw java.lang.IllegalArgumentException("No state found with name $s.name.")
+        transitionRelation[s]?.keys ?: throw IllegalArgumentException("No state found with name $s.name.")
     //endregion
 
     //region Visualisation

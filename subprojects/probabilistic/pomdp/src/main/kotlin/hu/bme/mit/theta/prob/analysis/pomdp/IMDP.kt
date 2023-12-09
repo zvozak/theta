@@ -1,8 +1,8 @@
 package hu.bme.mit.theta.prob.analysis.pomdp
 
 interface IMDP<S, A> {
-    var values: Values
-    var discount: Double
+    val discount: Double
+    val values: Values
     val states: MutableSet<S>
     val actions: MutableSet<A>
     val transitionRelation: HashMap<S, MutableMap<A, Distribution<S>>>
