@@ -382,8 +382,8 @@ object PomdpDslManager {
             }
 
             observations.zip(model.observation.probs.map { p -> p.text.toDouble() }).forEach{
-                (observation, prob) ->
-                    observationFunction[destination]!![action]!!.put(observation, prob)
+                (o, prob) ->
+                    observationFunction[destination]!![action]!!.put(o, prob)
             }
         }
 

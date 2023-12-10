@@ -84,6 +84,10 @@ class SimpleMDP(
 
     //region Visualisation
 
+    override fun buildGraph(): Graph{
+        return buildGraph(false)
+    }
+
     fun buildGraph(addTransitionNodes: Boolean = false): Graph{
         if (addTransitionNodes){
             return buildGraphWithTransitionNodes()
