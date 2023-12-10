@@ -83,6 +83,7 @@ open class POMDPImpl<S, A, O>(val mdp: IMDP<S, A>, open val observationFunction:
 open class SimplePomdp(
     mdp: SimpleMDP,
     observationFunction: Map<State, Map<Action, Distribution<Observation>>>,
+    val initBeliefState: Distribution<State>?,
     ) : POMDPImpl<State, Action, Observation>(
     mdp,
     observationFunction,

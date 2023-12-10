@@ -20,8 +20,7 @@ transition :
 ;
 destinationWithProbs : (probs+=PROB)+ ';';
 observation :
-    (O action=id COLON destination=id COLON obs=id prob=PROB)
-    | (O action=id COLON destionation=id (probs+=PROB)+)
+    (O action=id COLON destination=id COLON (probs+=PROB)+)
     | (O action=id (destinations+=destinationWithProbs)+)
 ;
 
