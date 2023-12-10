@@ -6,8 +6,9 @@ pomdp:
     STATES ((numberOfStates=NUMBER) | ((states+=STRING)+))
     ACTIONS ((numberOfActions=NUMBER) | ((actions+=id)+))
     OBSERVATIONS ((numberOfObservations=NUMBER) | ((observations+=id)+))
-    START (beliefStateProbs+=PROB)+
+    (START (beliefStateProbs+=PROB)+)?
     (transitions+=transition)+
+    (observationfunction+=observation)+
 ;
 
 Value_tail : REWARD|COST;
@@ -17,8 +18,14 @@ transition :
     | (T action=id COLON source=id (probs+=PROB)+)
     | (T action=id (sources+=sourceWithProbs)+)
 ;
+destinationWithProbs : (probs+=PROB)+ ';';
+observation :
+    (O action=id COLON destination=id COLON obs=id prob=PROB)
+    | (O action=id COLON destionation=id (probs+=PROB)+)
+    | (O action=id (destinations+=destinationWithProbs)+)
+;
 
-PROB : ('1.''0'+) | ('0.'[0-9]+);
+PROB : ZERO | ONE | ( ONE'.' ZERO+) | (ZERO '.'[0-9]+);
 
 COLON : ':';
 DISCOUNT : 'discount' COLON;
@@ -30,12 +37,13 @@ ACTIONS : 'actions' COLON  ;
 OBSERVATIONS : 'observations' COLON  ;
 START : 'start' COLON ;
 T : 'T' COLON  ;
-OBSERVATION : 'O' COLON  ;
+O : 'O' COLON  ;
 REWARDS : 'R' COLON  ;
 JOKER : '*';
 
 NUMBER : [1-9][0-9]* ;
 ZERO: '0';
+ONE: '1';
 STRING : ALPHANUMERIC ;
 ALPHA : [a-zA-Z];
 fragment ALPHANUMERIC : ALPHA (ALLOWEDATTCHAR)* ;
