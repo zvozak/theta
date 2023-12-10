@@ -85,9 +85,11 @@ class SimpleMDP(
     //region Visualisation
     fun buildGraph(): Graph {
         val graph = Graph("mdp", "mdp");
-        val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE)
-        val transitionNodeAttr = NodeAttributes.builder().shape(Shape.RECTANGLE).fillColor(Color.black)
+        val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE).fillColor(Color.GREEN)
+        val transitionNodeAttr = NodeAttributes.builder().shape(Shape.RECTANGLE).fillColor(Color.BLUE)
         val transitionEdgeAttr = EdgeAttributes.builder()
+        var edgeAttrWithProbs = EdgeAttributes.builder() // this will have different labels showing probabilites
+
 
         for (state in states) {
             stateAttr.label(state.name)
@@ -99,17 +101,20 @@ class SimpleMDP(
             for (distributions in transitionRelation[sourceState]!!) {
                 val actionID =
                     if (distributions.key.name.isBlank()) {
-                        sourceState.name + "tran" + id++
+                        "tran_" + id + "_from_" + sourceState.name
                     } else {
-                        distributions.key.name
+                        "tran_" + distributions.key.name + "_from_" + sourceState.name
                     }
 
-                graph.addNode(actionID, transitionNodeAttr.build())
-                graph.addEdge(sourceState.name, actionID, transitionEdgeAttr.label("").build())
+                graph.addNode(actionID, transitionNodeAttr.label(distributions.key.name).build())
+                graph.addEdge(sourceState.name, actionID, transitionEdgeAttr.build())
 
                 for ((destinationState, probability) in distributions.value.pmf) {
-                    transitionEdgeAttr.label(probability.toString())
-                    graph.addEdge(actionID, destinationState.name, transitionEdgeAttr.build())
+                    if (probability == 0.0){
+                        continue
+                    }
+                    edgeAttrWithProbs.label(probability.toString())
+                    graph.addEdge(actionID, destinationState.name, edgeAttrWithProbs.build())
                 }
             }
         }
@@ -119,7 +124,7 @@ class SimpleMDP(
 
     override fun visualize(filename: String) {
         val graph = this.buildGraph()
-        GraphvizWriter.getInstance().writeFile(graph, filename)
+        GraphvizWriter.getInstance().writeFileAutoConvert(graph, filename)
     }
 
     //endregion

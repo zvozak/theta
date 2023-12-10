@@ -42,7 +42,5 @@ fragment ALPHANUMERIC : ALPHA (ALLOWEDATTCHAR)* ;
 fragment ALLOWEDATTCHAR : '-' | '_'| [0-9] | ALPHA ;
 
 id : ZERO | NUMBER | STRING ;
-NEWLINE : [\n\r]+ -> skip;
-WS : [\t]+ -> skip;
-SPACE : ' ' -> skip;
+WS : [ \t\n\r]+ -> skip;
 COMMENT : '#' ~( '\r' | '\n' )* -> skip;
