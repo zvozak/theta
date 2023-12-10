@@ -27,8 +27,26 @@ object PomdpDslManager {
         val actions = extractActions(model)
         val observations = extractObservations(model)
         val initBeliefState = extractInitBeliefState(states, model)
+        var transitions = extractTransitions(model, actions, states)
 
+        val mdp = SimpleMDP(
+            model.discount.text.toDouble(),
+            Values.valueOf(model.values.text.uppercase()),
+            states as MutableSet<State>,
+            actions as MutableSet<Action>,
+            transitions,
+            null
+        )
 
+        var pomdp = SimplePomdp(mdp)
+        return pomdp
+    }
+
+    private fun extractTransitions(
+        model: PomdpDslParser.PomdpContext,
+        actions: Set<Action>,
+        states: Set<State>,
+    ): HashMap<State, MutableMap<Action, Distribution<State>>> {
         var transitionRelation = hashMapOf<State, MutableMap<Action, MutableMap<State, Double>>>()
         /*
         for (source in states){
@@ -50,9 +68,9 @@ object PomdpDslManager {
         when (tranDefType) {
             TransitionDefinitionType.FULL -> {
                 for (tran in model.transitions) {
-                    var action = actions.first{ a -> a.name == tran.action.text}
-                    var source = states.first{ s -> s.name == tran.source.text}
-                    var destination = states.first{ s -> s.name == tran.destination.text}
+                    var action = actions.first { a -> a.name == tran.action.text }
+                    var source = states.first { s -> s.name == tran.source.text }
+                    var destination = states.first { s -> s.name == tran.destination.text }
                     var prob = tran.prob.text.toDouble()
 
                     require(prob <= 1 && prob >= 0)
@@ -69,8 +87,8 @@ object PomdpDslManager {
 
             TransitionDefinitionType.ONELINERS -> {
                 for (tran in model.transitions) {
-                    var action = actions.first{ a-> a.name == tran.action.text }
-                    var source = states.first{ a-> a.name == tran.source.text }
+                    var action = actions.first { a -> a.name == tran.action.text }
+                    var source = states.first { a -> a.name == tran.source.text }
 
                     require(tran.probs.size == states.size)
 
@@ -88,18 +106,18 @@ object PomdpDslManager {
             }
 
             TransitionDefinitionType.MATRIX -> {
-                for (tran in model.transitions){
-                    var action = actions.first{ a-> a.name == tran.action.text }
+                for (tran in model.transitions) {
+                    var action = actions.first { a -> a.name == tran.action.text }
 
                     require(tran.sources.size == states.size && tran.sources.all { s -> s.probs.size == states.size })
 
                     states.zip(
                         tran.sources
                             .map { s -> states.zip(s.probs.map { p -> p.text.toDouble() }) }
-                    ).forEach{
-                        (source, probs) ->
+                    ).forEach { (source, probs) ->
                         for ((destination, prob) in probs) {
-                            if (transitionRelation.containsKey(source).not()) transitionRelation[source] = mutableMapOf()
+                            if (transitionRelation.containsKey(source).not()) transitionRelation[source] =
+                                mutableMapOf()
 
                             if (transitionRelation[source]!!.containsKey(action).not()) {
                                 transitionRelation[source]!!.put(action, mutableMapOf())
@@ -114,27 +132,16 @@ object PomdpDslManager {
         var transitions =
             hashMapOf<State, MutableMap<Action, Distribution<State>>>()
 
-        transitionRelation.forEach{ (source, tran) ->
-            if (transitions.containsKey(source).not()){
+        transitionRelation.forEach { (source, tran) ->
+            if (transitions.containsKey(source).not()) {
                 transitions.put(source, mutableMapOf())
             }
 
-            for ((action, distribution) in tran){
+            for ((action, distribution) in tran) {
                 transitions[source]!!.put(action, Distribution(distribution))
             }
         }
-
-        val mdp = SimpleMDP(
-            model.discount.text.toDouble(),
-            Values.valueOf(model.values.text.uppercase()),
-            states as MutableSet<State>,
-            actions as MutableSet<Action>,
-            transitions,
-            null
-        )
-
-        var pomdp = SimplePomdp(mdp)
-        return pomdp
+        return transitions
     }
 
     private fun extractInitBeliefState(
