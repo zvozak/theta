@@ -93,7 +93,7 @@ class SimpleMDP(
     }
     fun buildGraphWithTransitionNodes(): Graph {
         val graph = Graph("mdp", "mdp");
-        val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE).fillColor(Color.GREEN)
+        val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE).fillColor(Color.GREEN) // TODO need less vivid colours..
         val transitionNodeAttr = NodeAttributes.builder().shape(Shape.RECTANGLE).fillColor(Color.BLUE)
         val transitionEdgeAttr = EdgeAttributes.builder()
         var edgeAttrWithProbs = EdgeAttributes.builder() // this will have different labels showing probabilites
@@ -131,7 +131,7 @@ class SimpleMDP(
     }
     fun buildGraphWithDirectEdges(): Graph {
         val graph = Graph("mdp", "mdp");
-        val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE).fillColor(Color.GREEN)
+        val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE).fillColor(Color.lightGray)
         var edgeAttrWithProbs = EdgeAttributes.builder() // this will have different labels showing probabilites
 
 

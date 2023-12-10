@@ -52,7 +52,7 @@ class Observation(name: String) : NamedElement(name){
 
 interface IPOMDP<S, A, O> {
     fun getUnderlyingMDP(): IMDP<S, A>
-    fun getObservations(s: S): Distribution<O>
+    fun getObservations(s: S, a: A): Distribution<O>
     //fun computeBeliefMDP(numSteps: Int): MDP<BeliefState<S>, A>
 }
 /*
@@ -69,19 +69,24 @@ class BeliefState<S : IState>(val d: Distribution<S>) {
     }
 }*/
 
-open class POMDPImpl<S, A, O>(val mdp: IMDP<S, A>) : IPOMDP<S, A, O> {
-    lateinit var observationFunction: (S) -> Distribution<O>
+open class POMDPImpl<S, A, O>(val mdp: IMDP<S, A>, open val observationFunction: Map<S, Map<A, Distribution<O>>>) : IPOMDP<S, A, O> {
 
     override fun getUnderlyingMDP(): IMDP<S, A> = mdp
 
-    override fun getObservations(s: S): Distribution<O> = observationFunction(s)
+    override fun getObservations(s: S, a: A): Distribution<O> = observationFunction[s]?.get(a) ?: throw IllegalArgumentException("State or action is unkown.")
     /* TODO
         override fun computeBeliefMDP(numSteps: Int): MDP<BeliefState<S>, A> {
             val beliefMDP: MDP<BeliefState<S>, A>
         }*/
 }
 
-open class SimplePomdp(mdp: SimpleMDP) : POMDPImpl<State, Action, Observation>(mdp) {
+open class SimplePomdp(
+    mdp: SimpleMDP,
+    observationFunction: Map<State, Map<Action, Distribution<Observation>>>,
+    ) : POMDPImpl<State, Action, Observation>(
+    mdp,
+    observationFunction,
+) {
     companion object{
         fun readFromFile(filename: String): SimplePomdp {
             return PomdpDslManager.createPOMDP(filename)

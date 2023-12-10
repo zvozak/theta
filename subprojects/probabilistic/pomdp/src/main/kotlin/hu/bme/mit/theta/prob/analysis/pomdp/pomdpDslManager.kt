@@ -29,6 +29,9 @@ object PomdpDslManager {
         val initBeliefState = extractInitBeliefState(states, model)
         var transitions = extractTransitions(model, actions, states)
 
+        var observationfunction : Map<State, Map<Action, Distribution<Observation>>> = mutableMapOf()
+
+
         val mdp = SimpleMDP(
             model.discount.text.toDouble(),
             Values.valueOf(model.values.text.uppercase()),
@@ -38,7 +41,7 @@ object PomdpDslManager {
             null
         )
 
-        var pomdp = SimplePomdp(mdp)
+        var pomdp = SimplePomdp(mdp, observationfunction)
         return pomdp
     }
 
@@ -48,18 +51,6 @@ object PomdpDslManager {
         states: Set<State>,
     ): HashMap<State, MutableMap<Action, Distribution<State>>> {
         var transitionRelation = hashMapOf<State, MutableMap<Action, MutableMap<State, Double>>>()
-        /*
-        for (source in states){
-            transitionRelation.put(source, mutableMapOf())
-            var tran = transitionRelation[source]
-            for(action in actions){
-                tran!!.put(action, mutableMapOf())
-                for(destination in states){
-                    tran!![action]!!.put(destination, 0.0)
-                }
-            }
-        }*/
-
         var tranDefType = getTransitionDefinitionType(model.transitions[0])
         require(model.transitions.all { t -> getTransitionDefinitionType(t) == tranDefType }) {
             "Inconsistent transition definition."
@@ -67,68 +58,24 @@ object PomdpDslManager {
 
         when (tranDefType) {
             TransitionDefinitionType.FULL -> {
-                for (tran in model.transitions) {
-                    var action = actions.first { a -> a.name == tran.action.text }
-                    var source = states.first { s -> s.name == tran.source.text }
-                    var destination = states.first { s -> s.name == tran.destination.text }
-                    var prob = tran.prob.text.toDouble()
-
-                    require(prob <= 1 && prob >= 0)
-
-                    if (transitionRelation.containsKey(source).not()) transitionRelation[source] = mutableMapOf()
-
-                    if (transitionRelation[source]!!.containsKey(action).not()) {
-                        transitionRelation[source]!!.put(action, mutableMapOf())
-                    }
-
-                    transitionRelation[source]!![action]!!.put(destination, prob)
-                }
+                extractFullyDefinedTransitions(model, actions, states, transitionRelation)
             }
 
             TransitionDefinitionType.ONELINERS -> {
-                for (tran in model.transitions) {
-                    var action = actions.first { a -> a.name == tran.action.text }
-                    var source = states.first { a -> a.name == tran.source.text }
-
-                    require(tran.probs.size == states.size)
-
-                    if (transitionRelation.containsKey(source).not()) transitionRelation[source] = mutableMapOf()
-
-                    if (transitionRelation[source]!!.containsKey(action).not()) {
-                        transitionRelation[source]!!.put(action, mutableMapOf())
-                    }
-
-                    states.zip(tran.probs)
-                        .forEach { (destination, prob) ->
-                            transitionRelation[source]!![action]!!.put(destination, prob.text.toDouble())
-                        }
-                }
+                extractTransitionsDefinedWithSource(model, actions, states, transitionRelation)
             }
 
             TransitionDefinitionType.MATRIX -> {
-                for (tran in model.transitions) {
-                    var action = actions.first { a -> a.name == tran.action.text }
-
-                    require(tran.sources.size == states.size && tran.sources.all { s -> s.probs.size == states.size })
-
-                    states.zip(
-                        tran.sources
-                            .map { s -> states.zip(s.probs.map { p -> p.text.toDouble() }) }
-                    ).forEach { (source, probs) ->
-                        for ((destination, prob) in probs) {
-                            if (transitionRelation.containsKey(source).not()) transitionRelation[source] =
-                                mutableMapOf()
-
-                            if (transitionRelation[source]!!.containsKey(action).not()) {
-                                transitionRelation[source]!!.put(action, mutableMapOf())
-                            }
-                            transitionRelation[source]!![action]!!.put(destination, prob)
-                        }
-                    }
-                }
+                extractTransitionFromMatrix(model, actions, states, transitionRelation)
             }
         }
 
+        var transitions =
+            transformTransitionsToDistributions(transitionRelation)
+        return transitions
+    }
+
+    private fun transformTransitionsToDistributions(transitionRelation: HashMap<State, MutableMap<Action, MutableMap<State, Double>>>): HashMap<State, MutableMap<Action, Distribution<State>>> {
         var transitions =
             hashMapOf<State, MutableMap<Action, Distribution<State>>>()
 
@@ -142,6 +89,83 @@ object PomdpDslManager {
             }
         }
         return transitions
+    }
+
+    private fun extractTransitionFromMatrix(
+        model: PomdpDslParser.PomdpContext,
+        actions: Set<Action>,
+        states: Set<State>,
+        transitionRelation: HashMap<State, MutableMap<Action, MutableMap<State, Double>>>,
+    ) {
+        for (tran in model.transitions) {
+            var action = actions.first { a -> a.name == tran.action.text }
+
+            require(tran.sources.size == states.size && tran.sources.all { s -> s.probs.size == states.size })
+
+            states.zip(
+                tran.sources
+                    .map { s -> states.zip(s.probs.map { p -> p.text.toDouble() }) }
+            ).forEach { (source, probs) ->
+                for ((destination, prob) in probs) {
+                    if (transitionRelation.containsKey(source).not()) transitionRelation[source] =
+                        mutableMapOf()
+
+                    if (transitionRelation[source]!!.containsKey(action).not()) {
+                        transitionRelation[source]!!.put(action, mutableMapOf())
+                    }
+                    transitionRelation[source]!![action]!!.put(destination, prob)
+                }
+            }
+        }
+    }
+
+    private fun extractTransitionsDefinedWithSource(
+        model: PomdpDslParser.PomdpContext,
+        actions: Set<Action>,
+        states: Set<State>,
+        transitionRelation: HashMap<State, MutableMap<Action, MutableMap<State, Double>>>,
+    ) {
+        for (tran in model.transitions) {
+            var action = actions.first { a -> a.name == tran.action.text }
+            var source = states.first { a -> a.name == tran.source.text }
+
+            require(tran.probs.size == states.size)
+
+            if (transitionRelation.containsKey(source).not()) transitionRelation[source] = mutableMapOf()
+
+            if (transitionRelation[source]!!.containsKey(action).not()) {
+                transitionRelation[source]!!.put(action, mutableMapOf())
+            }
+
+            states.zip(tran.probs)
+                .forEach { (destination, prob) ->
+                    transitionRelation[source]!![action]!!.put(destination, prob.text.toDouble())
+                }
+        }
+    }
+
+    private fun extractFullyDefinedTransitions(
+        model: PomdpDslParser.PomdpContext,
+        actions: Set<Action>,
+        states: Set<State>,
+        transitionRelation: HashMap<State, MutableMap<Action, MutableMap<State, Double>>>,
+    ) {
+        for (tran in model.transitions) {
+            var action = actions.first { a -> a.name == tran.action.text }
+            var source = states.first { s -> s.name == tran.source.text }
+            var destination = states.first { s -> s.name == tran.destination.text }
+            var prob = tran.prob.text.toDouble()
+
+            require(prob <= 1 && prob >= 0)
+
+            if (transitionRelation.containsKey(source).not()) transitionRelation[source] = mutableMapOf()
+
+            if (transitionRelation[source]!!.containsKey(action).not()) {
+                transitionRelation[source]!!.put(action, mutableMapOf())
+            }
+
+            transitionRelation[source]!![action]!!.put(destination, prob)
+        }
     }
 
     private fun extractInitBeliefState(
