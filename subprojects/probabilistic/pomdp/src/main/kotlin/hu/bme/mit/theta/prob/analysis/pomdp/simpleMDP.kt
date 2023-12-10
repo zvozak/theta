@@ -83,7 +83,15 @@ class SimpleMDP(
     //endregion
 
     //region Visualisation
-    fun buildGraph(): Graph {
+
+    fun buildGraph(addTransitionNodes: Boolean = false): Graph{
+        if (addTransitionNodes){
+            return buildGraphWithTransitionNodes()
+        }
+
+        return buildGraphWithDirectEdges()
+    }
+    fun buildGraphWithTransitionNodes(): Graph {
         val graph = Graph("mdp", "mdp");
         val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE).fillColor(Color.GREEN)
         val transitionNodeAttr = NodeAttributes.builder().shape(Shape.RECTANGLE).fillColor(Color.BLUE)
@@ -115,6 +123,31 @@ class SimpleMDP(
                     }
                     edgeAttrWithProbs.label(probability.toString())
                     graph.addEdge(actionID, destinationState.name, edgeAttrWithProbs.build())
+                }
+            }
+        }
+
+        return graph
+    }
+    fun buildGraphWithDirectEdges(): Graph {
+        val graph = Graph("mdp", "mdp");
+        val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE).fillColor(Color.GREEN)
+        var edgeAttrWithProbs = EdgeAttributes.builder() // this will have different labels showing probabilites
+
+
+        for (state in states) {
+            stateAttr.label(state.name)
+            graph.addNode(state.name, stateAttr.build())
+        }
+
+        for (sourceState in states) {
+            for (distributions in transitionRelation[sourceState]!!) {
+                for ((destinationState, probability) in distributions.value.pmf) {
+                    if (probability == 0.0){
+                        continue
+                    }
+                    edgeAttrWithProbs.label(distributions.key.name + "  " + probability.toString())
+                    graph.addEdge(sourceState.name, destinationState.name, edgeAttrWithProbs.build())
                 }
             }
         }

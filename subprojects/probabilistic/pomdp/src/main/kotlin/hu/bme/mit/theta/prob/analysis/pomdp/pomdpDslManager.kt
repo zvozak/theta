@@ -69,8 +69,8 @@ object PomdpDslManager {
 
             TransitionDefinitionType.ONELINERS -> {
                 for (tran in model.transitions) {
-                    var action = Action(tran.action.text)
-                    var source = State(tran.source.text)
+                    var action = actions.first{ a-> a.name == tran.action.text }
+                    var source = states.first{ a-> a.name == tran.source.text }
 
                     require(tran.probs.size == states.size)
 
@@ -89,7 +89,7 @@ object PomdpDslManager {
 
             TransitionDefinitionType.MATRIX -> {
                 for (tran in model.transitions){
-                    var action = Action(tran.action.text)
+                    var action = actions.first{ a-> a.name == tran.action.text }
 
                     require(tran.sources.size == states.size && tran.sources.all { s -> s.probs.size == states.size })
 
@@ -140,7 +140,10 @@ object PomdpDslManager {
     private fun extractInitBeliefState(
         states: Set<State>,
         model: PomdpDslParser.PomdpContext,
-    ): Distribution<State> {
+    ): Distribution<State>? {
+        if (model.beliefStateProbs == null || model.beliefStateProbs.size == 0){
+            return null
+        }
         val pomdpInitState = buildMap<State, Double> {
             states.zip(model.beliefStateProbs.map { p ->
                 p.text.toDouble()
@@ -205,7 +208,7 @@ object PomdpDslManager {
         ) {
             return TransitionDefinitionType.FULL
         }
-        if (transition.prob != null &&
+        if (transition.probs != null &&
             transition.source != null) {
             return TransitionDefinitionType.ONELINERS
         }
