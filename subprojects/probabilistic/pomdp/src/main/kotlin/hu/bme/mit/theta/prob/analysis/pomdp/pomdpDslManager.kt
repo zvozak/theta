@@ -55,7 +55,10 @@ object PomdpDslManager {
         observations: Set<Observation>,
     ): HashMap<NTuple4<State, Action, State, Observation>, Double> {
         val rewards = hashMapOf<NTuple4<State, Action, State, Observation>, Double>()
-        require(model.rewardfunction != null && model.rewardfunction.size > 0)
+        if (model.rewardfunction == null || model.rewardfunction.size == 0){
+            return rewards
+        }
+
         val rewardDefType = getRewardDefinitionType(model.rewardfunction[0])
         require(model.rewardfunction.all { t -> getRewardDefinitionType(t) == rewardDefType }) {
             "Inconsistent transition definition."

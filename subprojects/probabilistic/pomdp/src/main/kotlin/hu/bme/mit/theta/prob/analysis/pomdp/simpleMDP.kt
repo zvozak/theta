@@ -151,7 +151,7 @@ class SimpleMDP(
                     if (probability == 0.0){
                         continue
                     }
-                    edgeAttrWithProbs.label(distributions.key.name + "  " + probability.toString())
+                    edgeAttrWithProbs.label(distributions.key.name + "\n" + probability.toString())
                     graph.addEdge(sourceState.name, destinationState.name, edgeAttrWithProbs.build())
                 }
             }

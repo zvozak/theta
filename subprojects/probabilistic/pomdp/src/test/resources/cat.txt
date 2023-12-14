@@ -8,7 +8,7 @@ start:
 0.5 0.5
 
 T: S : B : B 0.9
-T: S : B : M 0.9
+T: S : B : M 0.1
 T: S : M : M 1
 
 T: F : B : B 1
@@ -17,7 +17,7 @@ T: F : M : M 1
 T: J : B : B 0.5
 T: J : B : M 0.5
 T: J : M : M 0.7
-T: J : B : B 0.3
+T: J : M : B 0.3
 
 O: S : B : DA 1
 O: S : M : HA 1

@@ -68,6 +68,7 @@ public final class GraphvizWriter extends AbstractGraphWriter {
 	public String writeString(final Graph graph) {
 		final StringBuilder sb = new StringBuilder();
 		sb.append("digraph ").append(graph.getId()).append(" {").append(System.lineSeparator());
+		sb.append("\tgraph [overlap=false splines=true concentrate=false ranksep=2]").append(System.lineSeparator());
 		sb.append("\tlabel=\"").append(graph.getLabel()).append("\";").append(System.lineSeparator());
 
 		graph.getRootNodes().forEach(n -> printNode(n, sb));
@@ -75,6 +76,7 @@ public final class GraphvizWriter extends AbstractGraphWriter {
 		for (final Node node : graph.getNodes()) {
 			printEdges(node, sb);
 		}
+		sb.append("overlap=false");
 		sb.append('}');
 		return sb.toString();
 	}
@@ -206,6 +208,7 @@ public final class GraphvizWriter extends AbstractGraphWriter {
 				if (attributes.getWeight() != 1) {
 					sb.append(",weight=\"").append(attributes.getWeight()).append('\"');
 				}
+				sb.append(",labeldistance=0");
 				sb.append("];").append(System.lineSeparator());
 			}
 		}
