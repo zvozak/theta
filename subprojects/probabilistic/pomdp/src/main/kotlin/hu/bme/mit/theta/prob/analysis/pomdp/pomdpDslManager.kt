@@ -1,5 +1,6 @@
 package hu.bme.mit.theta.prob.analysis.pomdp
 
+import hu.bme.mit.theta.common.QuadFunction
 import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslLexer
 import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslParser
 import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslParser.ObservationContext
@@ -375,7 +376,7 @@ object PomdpDslManager {
             val destination = states.first { s -> s.name == tran.destination.text.replace('-', '_') }
             val prob = tran.prob.text.replace('-', '_').toDouble()
 
-            require(prob <= 1 && prob >= 0)
+            require(prob in 0.0..1.0)
 
             if (transitionRelation.containsKey(source).not()) transitionRelation[source] = mutableMapOf()
 
