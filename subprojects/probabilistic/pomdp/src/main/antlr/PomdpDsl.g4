@@ -13,22 +13,19 @@ pomdp:
 ;
 
 Value_tail : REWARD|COST;
-sourceWithProbs : (probs+=NUMBER)+ ';';
 transition :
     (T action=idOrJoker COLON source=idOrJoker COLON destination=idOrJoker prob=NUMBER)
     | (T action=idOrJoker COLON source=idOrJoker (probs+=NUMBER)+)
-    | (T action=idOrJoker (sources+=sourceWithProbs)+)
+    | (T action=idOrJoker (probs+=NUMBER)+)
 ;
-destinationWithProbs : (probs+=NUMBER)+ ';';
 observation :
     (O action=idOrJoker COLON destination=idOrJoker (probs+=NUMBER)+)
-    | (O action=idOrJoker (destinations+=destinationWithProbs)+)
+    | (O action=idOrJoker (probs+=NUMBER)+)
 ;
-destinationWithRewards : (rews+=NUMBER)+ ';';
 reward :
     (R action=idOrJoker COLON source=idOrJoker COLON destination=idOrJoker COLON obs=idOrJoker rew=NUMBER)
     | (R action=idOrJoker COLON source=idOrJoker COLON destination=idOrJoker (rews+=NUMBER)+)
-    | (R action=idOrJoker COLON source=idOrJoker (destinations+=destinationWithRewards)+)
+    | (R action=idOrJoker COLON source=idOrJoker (rews+=NUMBER)+)
 ;
 
 idOrJoker : id|JOKER;
