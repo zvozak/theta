@@ -3,14 +3,14 @@
 
 discount: 1
 values: reward
-states: interested bored
+states: 2
 actions: tv radio nothing
 observations: want-to-go dont-want-to-go
 
 # transition probabilities
 
-T: tv : interested      0.9 0.1
-T: tv : bored           0.6 0.4
+T: tv : 2      0.9 0.1
+T: tv : 1           0.6 0.4
 
 T: radio : interested   0.8 0.2
 T: radio : bored        0.3 0.7
@@ -33,6 +33,6 @@ O: nothing : bored      0.1 0.9
 
 R: tv : * : *: * -10
 
-R: radio : 1 : *: * -4
+R: radio : k : *: * -4
 
 R: nothing : * : *: * 0

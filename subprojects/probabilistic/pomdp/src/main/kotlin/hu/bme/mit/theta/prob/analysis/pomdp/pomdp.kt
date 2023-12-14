@@ -3,6 +3,7 @@ package hu.bme.mit.theta.prob.analysis.pomdp
 import hu.bme.mit.theta.common.visualization.EdgeAttributes
 import hu.bme.mit.theta.common.visualization.NodeAttributes
 import hu.bme.mit.theta.common.visualization.Shape
+import hu.bme.mit.theta.common.visualization.writer.GraphvizWriter
 import java.awt.Color
 
 open class NamedElement(val name: String) {
@@ -118,12 +119,14 @@ open class SimplePomdp(
             for (a in mdp.actions){
                 var distribution = observationFunction[s]?.get(a) ?: continue
                 for ((o, p) in distribution.pmf){
-                    if (graph.nodes.any { n -> n.id == o.name}){
+                    if (graph.nodes.any { n -> n.id == o.name}.not()){
                         graph.addNode(o.name, observationAttr.label(o.name).build())
                     }
                     graph.addEdge(s.name, o.name, edgeAttr.label(a.name + "  " + o.name).build())
                 }
             }
         }
+
+        GraphvizWriter.getInstance().writeFileAutoConvert(graph, filename)
     }
 }

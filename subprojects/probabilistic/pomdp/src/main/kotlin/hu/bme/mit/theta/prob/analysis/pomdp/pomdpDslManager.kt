@@ -4,6 +4,7 @@ import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslLexer
 import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslParser
 import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslParser.ObservationContext
 import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslParser.TransitionContext
+import hu.bme.mit.theta.pomdp.dsl.gen.PomdpDslParser.RewardContext
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import java.io.File
@@ -17,6 +18,7 @@ object PomdpDslManager {
         return createPomdp(stream)
     }
 
+    //region Reward
     @Throws(IOException::class)
     fun createPomdp(inputStream: InputStream?): SimplePomdp {
         val lexer = PomdpDslLexer(CharStreams.fromStream(inputStream))
@@ -29,16 +31,17 @@ object PomdpDslManager {
         val observations = extractObservations(model)
         val initBeliefState = extractInitBeliefState(states, model)
         val transitions = extractTransitions(model, actions, states)
-
-        val observationfunction : Map<State, Map<Action, Distribution<Observation>>> = extractObservations(model, actions, states, observations)
-
+        val observationfunction: Map<State, Map<Action, Distribution<Observation>>> =
+            extractObservations(model, actions, states, observations)
+        val rewardFunction = extractRewards(model, actions, states, observations)
 
         val mdp = SimpleMDP(
-            model.discount.text.toDouble(),
-            Values.valueOf(model.values.text.uppercase()),
+            model.discount.text.replace('-', '_').toDouble(),
+            Values.valueOf(model.values.text.replace('-', '_').uppercase()),
             states as MutableSet<State>,
             actions as MutableSet<Action>,
             transitions,
+            rewardFunction,
             null
         )
 
@@ -46,11 +49,132 @@ object PomdpDslManager {
         return pomdp
     }
 
+    private fun extractRewards(
+        model: PomdpDslParser.PomdpContext,
+        actions: Set<Action>,
+        states: Set<State>,
+        observations: Set<Observation>,
+    ): HashMap<NTuple4<State, Action, State, Observation>, Double> {
+        val rewards = hashMapOf<NTuple4<State, Action, State, Observation>, Double>()
+        require(model.rewardfunction != null && model.rewardfunction.size > 0)
+        val rewardDefType = getRewardDefinitionType(model.rewardfunction[0])
+        require(model.rewardfunction.all { t -> getRewardDefinitionType(t) == rewardDefType }) {
+            "Inconsistent transition definition."
+        }
+
+        when (rewardDefType) {
+            RewardDefinitionType.FULL -> {
+                extractFullyDefinedRewards(model, actions, states, observations, rewards)
+            }
+
+            RewardDefinitionType.ONELINERS -> {
+                extractRewardsDefinedWithDestination(model, actions, states, observations, rewards)
+            }
+
+            RewardDefinitionType.MATRIX -> {
+                extractRewardsFromMatrix(model, actions, states, observations, rewards)
+            }
+        }
+
+        return rewards
+    }
+
+    private fun extractRewardsFromMatrix(
+        model: PomdpDslParser.PomdpContext,
+        actions: Set<Action>,
+        states: Set<State>,
+        observations: Set<Observation>,
+        rewards: java.util.HashMap<NTuple4<State, Action, State, Observation>, Double>,
+    ) {
+        for (reward in model.rewardfunction) {
+            var source = states.first { s -> s.name == reward.source.text.replace('-', '_') }
+            var action = actions.first { a -> a.name == reward.action.text.replace('-', '_') }
+
+
+            for (destination in states) {
+                for (line in reward.destinations) {
+                    observations.zip(line.rews.map { r -> r.text.toDouble() }).forEach { (obs, rew) ->
+                        rewards.put(NTuple4(source, action, destination, obs), rew)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun extractRewardsDefinedWithDestination(
+        model: PomdpDslParser.PomdpContext,
+        actions: Set<Action>,
+        states: Set<State>,
+        observations: Set<Observation>,
+        rewards: HashMap<NTuple4<State, Action, State, Observation>, Double>,
+    ) {
+        for (reward in model.rewardfunction) {
+            var source = states.first { s -> s.name == reward.source.text.replace('-', '_') }
+            var action = actions.first { a -> a.name == reward.action.text.replace('-', '_') }
+            var destination = states.first { s -> s.name == reward.destination.text.replace('-', '_') }
+
+            observations.zip(reward.rews.map { r -> r.text.toDouble() }).forEach { (obs, rew) ->
+                rewards.put(NTuple4(source, action, destination, obs), rew)
+            }
+        }
+    }
+
+    private fun extractFullyDefinedRewards(
+        model: PomdpDslParser.PomdpContext,
+        actions: Set<Action>,
+        states: Set<State>,
+        observations: Set<Observation>,
+        rewards: HashMap<NTuple4<State, Action, State, Observation>, Double>,
+    ) {
+        for (reward in model.rewardfunction) {
+            var source = states.first { s -> s.name == reward.source.text.replace('-', '_') }
+            var action = actions.first { a -> a.name == reward.action.text.replace('-', '_') }
+            var destination = states.first { s -> s.name == reward.destination.text.replace('-', '_') }
+            var obs = observations.first { o -> o.name == reward.obs.text.replace('-', '_') }
+            var rew = reward.rew.text.toDouble()
+
+            rewards.put(NTuple4(source, action, destination, obs), rew)
+        }
+    }
+
+    fun getRewardDefinitionType(rewardfunction: RewardContext): RewardDefinitionType {
+        require(rewardfunction.action != null && rewardfunction.source != null)
+        {
+            "Invalid reward format: action must be specified."
+        }
+
+        if (rewardfunction.obs != null &&
+            rewardfunction.destination != null &&
+            rewardfunction.rew != null
+        ) {
+            return RewardDefinitionType.FULL
+        }
+        if (rewardfunction.rews != null &&
+            rewardfunction.destination != null
+        ) {
+            return RewardDefinitionType.ONELINERS
+        }
+
+        if (rewardfunction.destinationWithRewards != null) {
+            return RewardDefinitionType.MATRIX
+        }
+
+        throw IllegalArgumentException("Invalid reward format")
+    }
+
+    enum class RewardDefinitionType {
+        FULL,
+        ONELINERS,
+        MATRIX
+    }
+
+    //endregion
+
     private fun extractInitBeliefState(
         states: Set<State>,
         model: PomdpDslParser.PomdpContext,
     ): Distribution<State>? {
-        if (model.beliefStateProbs == null || model.beliefStateProbs.size == 0){
+        if (model.beliefStateProbs == null || model.beliefStateProbs.size == 0) {
             return null
         }
         val pomdpInitState = buildMap<State, Double> {
@@ -66,11 +190,13 @@ object PomdpDslManager {
     private fun extractObservations(model: PomdpDslParser.PomdpContext): Set<Observation> {
         val observations: Set<Observation> =
             if (model.numberOfObservations != null) {
-                NamedElement.createNumberedElements<Observation>(model.numberOfObservations.text.toInt())
+                NamedElement.createNumberedElements<Observation>(
+                    model.numberOfObservations.text.replace('-', '_').toInt()
+                )
             } else {
                 buildSet {
-                    for (e in model.observationfunction) {
-                        add(Observation(e.text))
+                    for (e in model.observations) {
+                        add(Observation(e.text.replace('-', '_')))
                     }
                 }
             }
@@ -80,11 +206,11 @@ object PomdpDslManager {
     private fun extractActions(model: PomdpDslParser.PomdpContext): Set<Action> {
         val actions: Set<Action> =
             if (model.numberOfActions != null) {
-                NamedElement.createNumberedElements<Action>(model.numberOfActions.text.toInt())
+                NamedElement.createNumberedElements<Action>(model.numberOfActions.text.replace('-', '_').toInt())
             } else {
                 buildSet {
                     for (e in model.actions) {
-                        add(Action(e.text))
+                        add(Action(e.text.replace('-', '_')))
                     }
                 }
             }
@@ -94,11 +220,11 @@ object PomdpDslManager {
     private fun extractStates(model: PomdpDslParser.PomdpContext): Set<State> {
         val states: Set<State> =
             if (model.numberOfStates != null) {
-                NamedElement.createNumberedElements<State>(model.numberOfStates.text.toInt())
+                NamedElement.createNumberedElements<State>(model.numberOfStates.text.replace('-', '_').toInt())
             } else {
                 buildSet {
                     for (e in model.states) {
-                        add(State(e.text))
+                        add(State(e.text.replace('-', '_')))
                     }
                 }
             }
@@ -120,11 +246,12 @@ object PomdpDslManager {
             return TransitionDefinitionType.FULL
         }
         if (transition.probs != null &&
-            transition.source != null) {
+            transition.source != null
+        ) {
             return TransitionDefinitionType.ONELINERS
         }
 
-        if (transition.sourceWithProbs != null){
+        if (transition.sourceWithProbs != null) {
             return TransitionDefinitionType.MATRIX
         }
 
@@ -136,6 +263,7 @@ object PomdpDslManager {
         ONELINERS,
         MATRIX
     }
+
     private fun extractTransitions(
         model: PomdpDslParser.PomdpContext,
         actions: Set<Action>,
@@ -189,7 +317,7 @@ object PomdpDslManager {
         transitionRelation: HashMap<State, MutableMap<Action, MutableMap<State, Double>>>,
     ) {
         for (tran in model.transitions) {
-            val action = actions.first { a -> a.name == tran.action.text }
+            val action = actions.first { a -> a.name == tran.action.text.replace('-', '_') }
 
             require(tran.sources.size == states.size && tran.sources.all { s -> s.probs.size == states.size })
 
@@ -217,8 +345,8 @@ object PomdpDslManager {
         transitionRelation: HashMap<State, MutableMap<Action, MutableMap<State, Double>>>,
     ) {
         for (tran in model.transitions) {
-            val action = actions.first { a -> a.name == tran.action.text }
-            val source = states.first { a -> a.name == tran.source.text }
+            val action = actions.first { a -> a.name == tran.action.text.replace('-', '_') }
+            val source = states.first { a -> a.name == tran.source.text.replace('-', '_') }
 
             require(tran.probs.size == states.size)
 
@@ -230,7 +358,7 @@ object PomdpDslManager {
 
             states.zip(tran.probs)
                 .forEach { (destination, prob) ->
-                    transitionRelation[source]!![action]!!.put(destination, prob.text.toDouble())
+                    transitionRelation[source]!![action]!!.put(destination, prob.text.replace('-', '_').toDouble())
                 }
         }
     }
@@ -242,10 +370,10 @@ object PomdpDslManager {
         transitionRelation: HashMap<State, MutableMap<Action, MutableMap<State, Double>>>,
     ) {
         for (tran in model.transitions) {
-            val action = actions.first { a -> a.name == tran.action.text }
-            val source = states.first { s -> s.name == tran.source.text }
-            val destination = states.first { s -> s.name == tran.destination.text }
-            val prob = tran.prob.text.toDouble()
+            val action = actions.first { a -> a.name == tran.action.text.replace('-', '_') }
+            val source = states.first { s -> s.name == tran.source.text.replace('-', '_') }
+            val destination = states.first { s -> s.name == tran.destination.text.replace('-', '_') }
+            val prob = tran.prob.text.replace('-', '_').toDouble()
 
             require(prob <= 1 && prob >= 0)
 
@@ -262,7 +390,6 @@ object PomdpDslManager {
 //endregion
 
 
-
     //region Extract Observations
     fun getObservationDefinitionType(observation: ObservationContext): ObservationDefinitionType {
         require(observation.action != null)
@@ -276,7 +403,7 @@ object PomdpDslManager {
             return ObservationDefinitionType.FULL
         }
 
-        if (observation.destinationWithProbs != null){
+        if (observation.destinationWithProbs != null) {
             return ObservationDefinitionType.MATRIX
         }
 
@@ -287,6 +414,7 @@ object PomdpDslManager {
         FULL,
         MATRIX
     }
+
     private fun extractObservations(
         model: PomdpDslParser.PomdpContext,
         actions: Set<Action>,
@@ -304,6 +432,7 @@ object PomdpDslManager {
                 ObservationDefinitionType.FULL -> {
                     extractFullyDefinedObservations(model, actions, states, observations)
                 }
+
                 ObservationDefinitionType.MATRIX -> {
                     extractObservationFromMatrix(model, actions, states, observations)
                 }
@@ -315,7 +444,8 @@ object PomdpDslManager {
     }
 
     private fun TransformObservationsToDistributions(
-        observationFunction: HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>>):
+        observationFunction: HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>>,
+    ):
             HashMap<State, MutableMap<Action, Distribution<Observation>>> {
         val observations =
             hashMapOf<State, MutableMap<Action, Distribution<Observation>>>()
@@ -341,7 +471,7 @@ object PomdpDslManager {
         val observationFunction: HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>> = hashMapOf()
 
         for (observation in model.observationfunction) {
-            val action = actions.first { a -> a.name == observation.action.text }
+            val action = actions.first { a -> a.name == observation.action.text.replace('-', '_') }
 
             require(observation.destinations.size == states.size && observation.destinations.all { s -> s.probs.size == observations.size })
 
@@ -350,7 +480,9 @@ object PomdpDslManager {
                     .map { d -> observations.zip(d.probs.map { p -> p.text.toDouble() }) }
             ).forEach { (destination, probs) ->
                 for ((observation, prob) in probs) {
-                    if (observationFunction.containsKey<State>(destination).not()) observationFunction[destination] =
+                    if (observationFunction.containsKey<State>(destination)
+                            .not()
+                    ) observationFunction[destination] =
                         mutableMapOf()
 
                     if (observationFunction[destination]!!.containsKey(action).not()) {
@@ -368,22 +500,22 @@ object PomdpDslManager {
         actions: Set<Action>,
         states: Set<State>,
         observations: Set<Observation>,
-    ) : HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>> {
+    ): HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>> {
         val observationFunction: HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>> = hashMapOf()
 
         for (observation in model.observationfunction) {
-            val action = actions.first { a -> a.name == observation.action.text }
-            val destination = states.first { s -> s.name == observation.destination.text }
+            val action = actions.first { a -> a.name == observation.action.text.replace('-', '_') }
+            val destination = states.first { s -> s.name == observation.destination.text.replace('-', '_') }
 
-            if (observationFunction.containsKey(destination).not()) observationFunction[destination] = mutableMapOf()
+            if (observationFunction.containsKey(destination).not()) observationFunction[destination] =
+                mutableMapOf()
 
             if (observationFunction[destination]!!.containsKey(action).not()) {
                 observationFunction[destination]!!.put(action, mutableMapOf())
             }
 
-            observations.zip(model.observation.probs.map { p -> p.text.toDouble() }).forEach{
-                (o, prob) ->
-                    observationFunction[destination]!![action]!!.put(o, prob)
+            observations.zip(model.observation.probs.map { p -> p.text.toDouble() }).forEach { (o, prob) ->
+                observationFunction[destination]!![action]!!.put(o, prob)
             }
         }
 

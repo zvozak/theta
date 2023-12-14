@@ -10,9 +10,10 @@ import java.awt.Color
 class SimpleMDP(
     discount: Double,
     values: Values,
-    states:  MutableSet<State>,
+    states: MutableSet<State>,
     actions: MutableSet<Action>,
-    transitionRelation:  HashMap<State, MutableMap<Action, Distribution<State>>>,
+    transitionRelation: HashMap<State, MutableMap<Action, Distribution<State>>>,
+    val rewardFunction: HashMap<NTuple4<State, Action, State, Observation>, Double>,
     override var initState: State? = null,
 ) : IMDP<State, Action> {
     override val discount = discount
