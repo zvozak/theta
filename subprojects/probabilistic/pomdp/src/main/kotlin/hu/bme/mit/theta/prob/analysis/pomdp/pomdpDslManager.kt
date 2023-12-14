@@ -31,7 +31,7 @@ object PomdpDslManager {
         val observations = extractObservations(model)
         val initBeliefState = extractInitBeliefState(states, model)
         val transitions = extractTransitions(model, actions, states)
-        val observationfunction: Map<State, Map<Action, Distribution<Observation>>> =
+        val observationfunction: Map<Pair<State, Action>, Distribution<Observation>> =
             extractObservations(model, actions, states, observations)
         val rewardFunction = extractRewards(model, actions, states, observations)
 
@@ -417,7 +417,7 @@ object PomdpDslManager {
         actions: Set<Action>,
         states: Set<State>,
         observations: Set<Observation>,
-    ): HashMap<State, MutableMap<Action, Distribution<Observation>>> {
+    ): HashMap<Pair<State, Action>, Distribution<Observation>> {
 
         val observationDefType = getObservationDefinitionType(model.observationfunction[0])
         require(model.observationfunction.all { t -> getObservationDefinitionType(t) == observationDefType }) {
@@ -430,6 +430,10 @@ object PomdpDslManager {
                     extractFullyDefinedObservations(model, actions, states, observations)
                 }
 
+                ObservationDefinitionType.FULL -> {
+                    extractOneLinerObservations(model, actions, states, observations)
+                }
+
                 ObservationDefinitionType.MATRIX -> {
                     extractObservationFromMatrix(model, actions, states, observations)
                 }
@@ -439,21 +443,15 @@ object PomdpDslManager {
     }
 
     private fun transformObservationsToDistributions(
-        observationFunction: HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>>,
-    ):
-            HashMap<State, MutableMap<Action, Distribution<Observation>>> {
+        observationFunction: HashMap<Pair<State, Action>, MutableMap<Observation, Double>>,
+    ): HashMap<Pair<State, Action>, Distribution<Observation>> {
         val observations =
-            hashMapOf<State, MutableMap<Action, Distribution<Observation>>>()
+            hashMapOf<Pair<State, Action>, Distribution<Observation>>()
 
-        observationFunction.forEach { (source, observation) ->
-            if (observations.containsKey(source).not()) {
-                observations[source] = mutableMapOf()
-            }
-
-            for ((action, distribution) in observation) {
-                observations[source]!![action] = Distribution(distribution)
-            }
+        observationFunction.forEach { (key, distribution) ->
+            observations[key] = Distribution(distribution)
         }
+
         return observations
     }
 
@@ -462,8 +460,8 @@ object PomdpDslManager {
         actions: Set<Action>,
         states: Set<State>,
         observations: Set<Observation>,
-    ): HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>> {
-        val observationFunction: HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>> = hashMapOf()
+    ): HashMap<Pair<State, Action>, MutableMap<Observation, Double>> {
+        val observationFunction: HashMap<Pair<State, Action>, MutableMap<Observation, Double>> = hashMapOf()
 
         for (observation in model.observationfunction) {
             val action = actions.first { a -> a.name == observation.action.text.replace('-', '_') }
@@ -472,46 +470,68 @@ object PomdpDslManager {
 
             for (i in 0..states.size-1){
                 val destination = states.elementAt(i)
-                if (observationFunction.containsKey<State>(destination)
-                        .not()
-                ) observationFunction[destination] =
-                    mutableMapOf()
+                val key = Pair(destination, action)
 
-                if (observationFunction[destination]!!.containsKey(action).not()) {
-                    observationFunction[destination]!![action] = mutableMapOf()
+                if (observationFunction.containsKey(key).not()) {
+                    observationFunction[key] =
+                        mutableMapOf()
                 }
 
                 for (j in 0..states.size-1){
                     val obs = observations.elementAt(j)
                     val prob = observation.probs[i*states.size + j].text.toDouble()
-                    observationFunction[destination]!![action]!![obs] = prob
+                    observationFunction[key]!![obs] = prob
                 }
             }
         }
         return observationFunction
     }
-
+    
     private fun extractFullyDefinedObservations(
         model: PomdpDslParser.PomdpContext,
         actions: Set<Action>,
         states: Set<State>,
         observations: Set<Observation>,
-    ): HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>> {
-        val observationFunction: HashMap<State, MutableMap<Action, MutableMap<Observation, Double>>> = hashMapOf()
+    ): HashMap<Pair<State, Action>, MutableMap<Observation, Double>> {
+        val observationFunction: HashMap<Pair<State, Action>, MutableMap<Observation, Double>> = hashMapOf()
 
         for (observation in model.observationfunction) {
             val action = actions.first { a -> a.name == observation.action.text.replace('-', '_') }
             val destination = states.first { s -> s.name == observation.destination.text.replace('-', '_') }
+            val obs = observations.first{ o -> o.name == observation.obs.text.replace('-', '_')}
+            var key = Pair(destination, action)
+            var prob = observation.prob.text.toDouble()
 
-            if (observationFunction.containsKey(destination).not()) observationFunction[destination] =
-                mutableMapOf()
+            if (observationFunction.containsKey(key).not()) {
+                observationFunction[key] = mutableMapOf()
+            }
 
-            if (observationFunction[destination]!!.containsKey(action).not()) {
-                observationFunction[destination]!![action] = mutableMapOf()
+            observationFunction[key]!![obs] = prob
+        }
+
+        return observationFunction
+    }
+
+    private fun extractOneLinerObservations(
+        model: PomdpDslParser.PomdpContext,
+        actions: Set<Action>,
+        states: Set<State>,
+        observations: Set<Observation>,
+    ): HashMap<Pair<State, Action>, MutableMap<Observation, Double>> {
+        val observationFunction: HashMap<Pair<State, Action>, MutableMap<Observation, Double>> = hashMapOf()
+
+        for (observation in model.observationfunction) {
+            val action = actions.first { a -> a.name == observation.action.text.replace('-', '_') }
+            val destination = states.first { s -> s.name == observation.destination.text.replace('-', '_') }
+            val key = Pair(destination, action)
+
+            if (observationFunction.containsKey(key).not()) {
+                observationFunction[key] =
+                    mutableMapOf()
             }
 
             observations.zip(model.observation.probs.map { p -> p.text.toDouble() }).forEach { (o, prob) ->
-                observationFunction[destination]!![action]!![o] = prob
+                observationFunction[key]!![o] = prob
             }
         }
 

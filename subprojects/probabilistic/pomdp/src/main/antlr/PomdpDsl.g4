@@ -9,7 +9,7 @@ pomdp:
     (START (beliefStateProbs+=NUMBER)+)?
     (transitions+=transition)+
     (observationfunction+=observation)+
-    (rewardfunction+=reward)+
+    (rewardfunction+=reward)*
 ;
 
 Value_tail : REWARD|COST;
@@ -19,7 +19,8 @@ transition :
     | (T action=idOrJoker (probs+=NUMBER)+)
 ;
 observation :
-    (O action=idOrJoker COLON destination=idOrJoker (probs+=NUMBER)+)
+    (O action=idOrJoker COLON destination=idOrJoker COLON obs=idOrJoker prob=NUMBER)
+    | (O action=idOrJoker COLON destination=idOrJoker (probs+=NUMBER)+)
     | (O action=idOrJoker (probs+=NUMBER)+)
 ;
 reward :

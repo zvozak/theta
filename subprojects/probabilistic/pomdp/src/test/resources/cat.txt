@@ -1,0 +1,33 @@
+discount: 0.95
+values: reward
+states: B M # boldog morcos
+actions: S J F # simi játszik figyel
+observations: KE DO NI HA DA # kergeti dorombol nincs harap dagaszt
+
+start:
+0.5 0.5
+
+T: S : B : B 0.9
+T: S : B : M 0.9
+T: S : M : M 1
+
+T: F : B : B 1
+T: F : M : M 1
+
+T: J : B : B 0.5
+T: J : B : M 0.5
+T: J : M : M 0.7
+T: J : B : B 0.3
+
+O: S : B : DA 1
+O: S : M : HA 1
+
+O: F : B : DO 0.9
+O: F : B : NI 0.1
+O: F : M : DO 0.1
+O: F : M : NI 0.9
+
+O: J : B : KE 0.5
+O: J : B : NI 0.5
+O: J : M : KE 0.6
+O: J : M : NI 0.4

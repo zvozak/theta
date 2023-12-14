@@ -78,14 +78,15 @@ class BeliefState<S : IState>(val d: Distribution<S>) {
     }
 }*/
 
-open abstract class POMDPImpl<S, A, O>(val mdp: IMDP<S, A>, open val observationFunction: Map<S, Map<A, Distribution<O>>>) : IPOMDP<S, A, O> {
+abstract class POMDPImpl<S, A, O>(val mdp: IMDP<S, A>, open val observationFunction: Map<Pair<S, A>, Distribution<O>>) : IPOMDP<S, A, O> {
 
     override fun getUnderlyingMDP(): IMDP<S, A> = mdp
     override fun visualiseUnderlyingMDP(filename: String) {
         mdp.visualize(filename)
     }
 
-    override fun getObservations(s: S, a: A): Distribution<O> = observationFunction[s]?.get(a) ?: throw IllegalArgumentException("State or action is unkown.")
+    override fun getObservations(s: S, a: A): Distribution<O> =
+        observationFunction[Pair(s, a)] ?: throw IllegalArgumentException("State or action is unkown.")
     /* TODO
         override fun computeBeliefMDP(numSteps: Int): MDP<BeliefState<S>, A> {
             val beliefMDP: MDP<BeliefState<S>, A>
@@ -94,7 +95,7 @@ open abstract class POMDPImpl<S, A, O>(val mdp: IMDP<S, A>, open val observation
 
 open class SimplePomdp(
     mdp: SimpleMDP,
-    observationFunction: Map<State, Map<Action, Distribution<Observation>>>,
+    observationFunction: Map<Pair<State, Action>, Distribution<Observation>>,
     val initBeliefState: Distribution<State>?,
     ) : POMDPImpl<State, Action, Observation>(
     mdp,
@@ -117,7 +118,7 @@ open class SimplePomdp(
 
         for (s in mdp.states){
             for (a in mdp.actions){
-                var distribution = observationFunction[s]?.get(a) ?: continue
+                var distribution = observationFunction[Pair(s, a)] ?: continue
                 for ((o, p) in distribution.pmf){
                     if (graph.nodes.any { n -> n.id == o.name}.not()){
                         graph.addNode(o.name, observationAttr.label(o.name).build())
