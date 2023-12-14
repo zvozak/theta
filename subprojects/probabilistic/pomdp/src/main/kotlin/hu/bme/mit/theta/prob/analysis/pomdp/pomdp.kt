@@ -60,7 +60,7 @@ interface IPOMDP<S, A, O> {
     fun getUnderlyingMDP(): IMDP<S, A>
     fun getObservations(s: S, a: A): Distribution<O>
     //fun computeBeliefMDP(numSteps: Int): MDP<BeliefState<S>, A>
-    fun visualiseUnderlyingMDP(filename: String)
+    fun visualiseUnderlyingMDP(filename: String, withTransitionNodes: Boolean)
     fun visualiseBeliefMDP(filename: String, numSteps: Int)
     fun visualise(filename: String)
 }
@@ -81,8 +81,8 @@ class BeliefState<S : IState>(val d: Distribution<S>) {
 abstract class POMDPImpl<S, A, O>(val mdp: IMDP<S, A>, open val observationFunction: Map<Pair<S, A>, Distribution<O>>) : IPOMDP<S, A, O> {
 
     override fun getUnderlyingMDP(): IMDP<S, A> = mdp
-    override fun visualiseUnderlyingMDP(filename: String) {
-        mdp.visualize(filename)
+    override fun visualiseUnderlyingMDP(filename: String, withTransitionNodes: Boolean) {
+        mdp.visualize(filename, withTransitionNodes)
     }
 
     override fun getObservations(s: S, a: A): Distribution<O> =

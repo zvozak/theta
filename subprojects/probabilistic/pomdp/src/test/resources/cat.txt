@@ -7,8 +7,16 @@ observations: KE DO NI HA DA # kergeti dorombol nincs harap dagaszt
 start:
 0.5 0.5
 
-T: S : B : B 0.9
-T: S : B : M 0.1
+# T: S : B : B 0.9
+# T: S : B : M 0.1
+# T: S : M : M 1
+T: S
+0.9 0.1
+0.0 1.0
+
+
+# T: S : B : 0.9 0.1
+
 T: S : M : M 1
 
 T: F : B : B 1

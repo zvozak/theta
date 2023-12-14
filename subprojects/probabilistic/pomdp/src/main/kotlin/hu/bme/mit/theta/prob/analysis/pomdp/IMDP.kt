@@ -14,7 +14,7 @@ interface IMDP<S, A> {
     fun getNextStateDistribution(s: S, a: A): Distribution<S>
     fun addState(s: S)
     fun addTransition(s: S, result: Distribution<S>, action: A)
-    fun visualize(filename: String)
+    fun visualize(filename: String, withTransitionNodes: Boolean)
     fun buildGraph(): Graph
 }
 

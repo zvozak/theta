@@ -98,8 +98,8 @@ class SimpleMDP(
     }
     fun buildGraphWithTransitionNodes(): Graph {
         val graph = Graph("mdp", "mdp");
-        val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE).fillColor(Color.GREEN) // TODO need less vivid colours..
-        val transitionNodeAttr = NodeAttributes.builder().shape(Shape.RECTANGLE).fillColor(Color.BLUE)
+        val stateAttr = NodeAttributes.builder().shape(Shape.CIRCLE).fillColor(Color.lightGray) // TODO need less vivid colours..
+        val transitionNodeAttr = NodeAttributes.builder().shape(Shape.RECTANGLE).fillColor(Color.lightGray)
         val transitionEdgeAttr = EdgeAttributes.builder()
         var edgeAttrWithProbs = EdgeAttributes.builder() // this will have different labels showing probabilites
 
@@ -160,8 +160,8 @@ class SimpleMDP(
         return graph
     }
 
-    override fun visualize(filename: String) {
-        val graph = this.buildGraph()
+    override fun visualize(filename: String, withTransitionNodes: Boolean) {
+        val graph = this.buildGraph(withTransitionNodes)
         GraphvizWriter.getInstance().writeFileAutoConvert(graph, filename)
     }
 
