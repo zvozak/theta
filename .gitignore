@@ -16,3 +16,9 @@ dest/
 .idea/
 *.iml
 *.iws
+
+*.jpg
+*.jpeg
+*.dot
+*.png
+*.svg
