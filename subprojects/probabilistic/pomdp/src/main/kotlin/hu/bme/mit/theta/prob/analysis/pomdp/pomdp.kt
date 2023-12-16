@@ -123,7 +123,7 @@ open class SimplePomdp(
                     if (graph.nodes.any { n -> n.id == o.name}.not()){
                         graph.addNode(o.name, observationAttr.label(o.name).build())
                     }
-                    graph.addEdge(s.name, o.name, edgeAttr.label(a.name + "  " + o.name).build())
+                    graph.addEdge(s.name, o.name, edgeAttr.label(a.name + "\n" + p.toString()).build())
                 }
             }
         }
