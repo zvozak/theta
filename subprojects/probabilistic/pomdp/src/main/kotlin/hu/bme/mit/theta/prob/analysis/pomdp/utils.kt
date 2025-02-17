@@ -35,17 +35,17 @@ open class NamedElement(val name: String) {
     }
 }
 
-class Action(name: String) : NamedElement(name){
+open class Action(name: String) : NamedElement(name){
     override fun equals(other: Any?): Boolean {
         return other is Action && other.name.equals(this.name)
     }
 }
-class State(name: String) : NamedElement(name){
+open class State(name: String) : NamedElement(name){
     override fun equals(other: Any?): Boolean {
         return other is State && other.name.equals(this.name)
     }
 }
-class Observation(name: String) : NamedElement(name){
+open class Observation(name: String) : NamedElement(name){
     override fun equals(other: Any?): Boolean {
         return other is Observation && other.name.equals(this.name)
     }

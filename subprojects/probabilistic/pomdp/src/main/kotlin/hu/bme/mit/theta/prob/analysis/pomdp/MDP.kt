@@ -7,47 +7,52 @@ import hu.bme.mit.theta.common.visualization.Shape
 import hu.bme.mit.theta.common.visualization.writer.GraphvizWriter
 import java.awt.Color
 
-class SimpleMDP(
-    discount: Double,
-    values: Values,
-    states: MutableSet<State>,
-    actions: MutableSet<Action>,
-    transitionRelation: HashMap<State, MutableMap<Action, Distribution<State>>>,
-    val rewardFunction: HashMap<NTuple4<State, Action, State, Observation>, Double>,
-    override var initState: State? = null,
-) : IMDP<State, Action> {
-    override val discount = discount
-    override var values = values
-    override val states = states
-    override val actions = actions
-    override val transitionRelation = transitionRelation
+open class MDP<S: State, A: Action> (
+    //discount: Double,
+    //values: Values,
+    override val states: MutableSet<S> = mutableSetOf(),
+    override val actions: MutableSet<A> = mutableSetOf(),
+    override val transitionRelation: HashMap<S, HashMap<A, Distribution<S>>> = hashMapOf(),
+    //val rewardFunction: HashMap<NTuple4<S, A, S, O>, Double>,
+    override var initState: S? = null,
+) : IMDP<S, A> {
+    //override val discount = discount
+    //override var values = values
     //override var initState = initState
 
     //region Modifiers
-    fun addState(name: String): State {
-        val newState = State(name)
-        require(states.contains(newState).not()) { "State $name has already been defined." }
+    /*fun addState(name: String): S {
+        val newState = S(name)
+        require(states.contains(newState).not()) { "S $name has already been defined." }
 
         states.add(newState)
         return newState
-    }
+    }*/
 
-    override fun addState(newState: State) {
-        require(states.contains(newState).not()) { "State $newState.name has already been defined." }
+    override fun isActionAvailableFrom(a: A, s: S): Boolean{
+        return getAvailableActions(s).contains(a)
+    }
+    override fun addState(newState: S) {
+        require(states.contains(newState).not()) { "S $newState.name has already been defined." }
         states.add(newState)
     }
 
-    override fun addTransition(source: State, destinations: Distribution<State>, action: Action) {
+    override fun addAction(newAction: A) {
+        require(actions.contains(newAction).not()) { "S $newAction.name has already been defined." }
+        actions.add(newAction)
+    }
+
+    override fun addTransition(source: S, destinations: Distribution<S>, action: A) {
         require(states.containsAll(transitionRelation.keys)) { "A transition must not lead to states outside of the MDP!" }
-        if (transitionRelation.containsKey(source).not()) transitionRelation[source] = mutableMapOf()
+        if (transitionRelation.containsKey(source).not()) transitionRelation[source] = hashMapOf()
 
         require(
             transitionRelation[source]!!.containsKey(action).not()
-        ) { "Action $action.name has already been defined on state $source.name." }
+        ) { "A $action.name has already been defined on state $source.name." }
         transitionRelation[source]!![action] = destinations
     }
 
-    /*fun setInitState(s: State) {
+    /*fun setInitState(s: S) {
         require(s in states) { "Initial state could not be set: no state found with name $s.name." }
         initState = s
     }
@@ -57,7 +62,7 @@ class SimpleMDP(
 
     fun setInitState(name: String) {
         initState = states.find { s -> s.name == name } ?: throw IllegalArgumentException("meow")
-        require(initState != null) { "State $name cannot be set as initial state: it cannot be found." }
+        require(initState != null) { "S $name cannot be set as initial state: it cannot be found." }
     }*/
 
 
@@ -65,21 +70,21 @@ class SimpleMDP(
 
     //region Accessors
     /*
-    override fun getInitState(): State = initState ?: throw IllegalStateException("No initial state has been set yet.")
+    override fun getInitState(): S = initState ?: throw IllegalStateException("No initial state has been set yet.")
     override fun getDiscount() = discount
     override fun setDiscount(discount: Double) {
         this.discount = discount
     }
 */
-    override fun getNextStateDistribution(s: State, a: Action): Distribution<State> {
-        require(s in states) { "State $s.name cannot be found." }
+    override fun getNextStateDistribution(s: S, a: A): Distribution<S> {
+        require(s in states) { "S $s.name cannot be found." }
         require(transitionRelation.containsKey(s)) { "No actions are available from state $s.name." }
 
         return transitionRelation[s]!!.get(a)
-            ?: throw IllegalArgumentException("Action $a.name is not available from state $s.name.")
+            ?: throw IllegalArgumentException("A $a.name is not available from state $s.name.")
     }
 
-    override fun getAvailableActions(s: State): Collection<Action> =
+    override fun getAvailableActions(s: S): Collection<A> =
         transitionRelation[s]?.keys ?: throw IllegalArgumentException("No state found with name $s.name.")
     //endregion
 
@@ -226,13 +231,13 @@ class SimpleMDP(
         values = Values.valueOf(input[1])
     }
 
-    fun readAndAddDistributions(inputReader: PeekableScanner, action: Action) {
+    fun readAndAddDistributions(inputReader: PeekableScanner, action: A) {
         for (indexOfState in 0..states.size - 1) {
             addTransition(states.elementAt(indexOfState), readDistribution(inputReader), action)
         }
     }
 
-    fun readDistribution(inputReader: PeekableScanner): Distribution<State> {
+    fun readDistribution(inputReader: PeekableScanner): Distribution<S> {
         require(inputReader.hasNext()) {
             ParseError.transition + "end of file is reached."
         }
@@ -247,7 +252,7 @@ class SimpleMDP(
         }
 
         return Distribution(
-            buildMap<State, Double> {
+            buildMap<S, Double> {
                 for (i in 0..(input.size - 1)) {
                     put(states.elementAt(i), input[i].toDouble())
                 }
@@ -259,7 +264,7 @@ class SimpleMDP(
         firstLine: List<String>,
         inputReader: PeekableScanner,
     ) {
-        val transitions: HashMap<State, MutableMap<Action, HashMap<State, Double>>> = hashMapOf()
+        val transitions: HashMap<S, MutableMap<A, HashMap<S, Double>>> = hashMapOf()
         if (firstLine[0] != "T") {
             return
         }
@@ -297,7 +302,7 @@ class SimpleMDP(
                 }
 
 
-            val destinations: Set<State> =
+            val destinations: Set<S> =
                 if (destinationName == wildcard) {
                     states
                 } else {
@@ -406,11 +411,11 @@ class SimpleMDP(
     }
 
     fun readStates(sc: PeekableScanner) {
-        readNamedElements<State>(sc)
+        readNamedElements<S>(sc)
     }
 
     fun readActions(sc: PeekableScanner) {
-        readNamedElements<Action>(sc)
+        readNamedElements<A>(sc)
     }
 
     //endregion
